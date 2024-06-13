@@ -1,9 +1,3 @@
-r"""
-The file creates a pickle file where the values needed for loading of dataset is stored and the model can load it
-when needed.
-
-Parameters from hparam.py will be used
-"""
 import argparse
 import json
 import os
@@ -16,8 +10,8 @@ from hydra import compose, initialize
 from omegaconf import open_dict
 from tqdm.auto import tqdm
 
-from matcha.data.text_mel_datamodule import TextMelDataModule
-from matcha.utils.logging_utils import pylogger
+from leanspeech.data.text_mel_datamodule import TextMelDataModule
+from leanspeech.utils.logging_utils import pylogger
 
 log = pylogger.get_pylogger(__name__)
 
@@ -54,7 +48,6 @@ def main():
         "-i",
         "--input-config",
         type=str,
-        default="vctk.yaml",
         help="The name of the yaml config file under configs/data",
     )
 

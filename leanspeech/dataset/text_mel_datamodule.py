@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import random
@@ -11,14 +12,16 @@ import torchaudio as ta
 from lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
-from ..text import process_and_phonemize_text
+from ..text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
 from ..utils import normalize
 from ..utils.audio import mel_spectrogram
 
 
 def parse_filelist(filelist_path, split_char="|"):
-    with open(filelist_path, encoding="utf-8") as f:
-        filepaths_and_text = [line.strip().split(split_char) for line in f]
+    with open(filelist_path, encoding="utf-8") as file:
+        reader = csv.reader(file, delimiter="|")
+        filepaths_and_text = list(reader)
+    filepaths_and_text = [item for item in filepaths_and_text if item]
     return filepaths_and_text
 
 
@@ -27,6 +30,7 @@ class TextMelDataModule(LightningDataModule):
         self,
         name,
         language,
+        text_processor,
         train_filelist_path,
         valid_filelist_path,
         batch_size,
@@ -49,6 +53,12 @@ class TextMelDataModule(LightningDataModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
 
+        if text_processor == "matcha":
+            self.text_processor_func = process_and_phonemize_text_matcha
+        elif text_processor == "piper":
+            self.text_processor_func = process_and_phonemize_text_piper
+        else:
+            raise ValueError(f"Unknown text processor `{text_processor}``")
         self.language = self.hparams.language
         self.cache_dir = self.hparams.cache_dir
 
@@ -62,6 +72,7 @@ class TextMelDataModule(LightningDataModule):
 
         self.trainset = TextMelDataset(  # pylint: disable=attribute-defined-outside-init
             self.hparams.language,
+            self.text_processor_func,
             self.hparams.train_filelist_path,
             self.hparams.n_fft,
             self.hparams.n_feats,
@@ -76,6 +87,7 @@ class TextMelDataModule(LightningDataModule):
         )
         self.validset = TextMelDataset(  # pylint: disable=attribute-defined-outside-init
             self.hparams.language,
+            self.text_processor_func,
             self.hparams.valid_filelist_path,
             self.hparams.n_fft,
             self.hparams.n_feats,
@@ -126,6 +138,7 @@ class TextMelDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         language,
+        text_processor_func,
         filelist_path,
         n_fft=1024,
         n_mels=80,
@@ -138,6 +151,8 @@ class TextMelDataset(torch.utils.data.Dataset):
         cache_dir=None,
         seed=None,
     ):
+        self.language = language
+        self.text_processor_func = text_processor_func
         self.filepaths_and_text = parse_filelist(filelist_path)
         self.n_fft = n_fft
         self.n_mels = n_mels
@@ -163,11 +178,9 @@ class TextMelDataset(torch.utils.data.Dataset):
         file_stem = md5(fp_bytes).hexdigest()
         return self.cache_dir.joinpath(file_stem)
 
-    def get_datapoint(self, filepath_and_text):
-        filepath, text = filepath_and_text[0], filepath_and_text[1]
-
+    def get_datapoint(self, filepath, text):
         cache_filename = self.get_cache_filename(filepath)
-        cache_json, cache_mel, cache_durations = (
+        cache_json, cache_mel = (
             cache_filename.with_suffix(".json"),
             cache_filename.with_suffix(".mel.npy"),
         )
@@ -176,11 +189,15 @@ class TextMelDataset(torch.utils.data.Dataset):
                 data = json.load(file)
             phoneme_ids = data["phoneme_ids"]
             text = data["text"]
-            mel = np.load(cache_mel, allow_pickle=False)
+            mel = torch.from_numpy(
+                np.load(cache_mel, allow_pickle=False)
+            )
         else:
             phoneme_ids, text = self.process_text(text)
             if filepath.endswith(".mel.npy"):
-                mel = np.load(filepath, allow_pickle=False)
+                mel = torch.from_numpy(
+                    np.load(filepath, allow_pickle=False)
+                )
             else:
                 mel = self.get_mel(filepath)
             # Cache
@@ -189,12 +206,13 @@ class TextMelDataset(torch.utils.data.Dataset):
                 json.dump(data, file, ensure_ascii=False)
             np.save(cache_mel, mel, allow_pickle=False)
 
+        x = torch.LongTensor(phoneme_ids)
         durations = self.get_durations(filepath, phoneme_ids)
         return {
-            "x": phoneme_ids,
+            "x": x,
             "x_text": text,
             "y": mel,
-            "durations": durations
+            "durations": durations,
             "filepath": filepath,
         }
 
@@ -231,12 +249,12 @@ class TextMelDataset(torch.utils.data.Dataset):
         return mel
 
     def process_text(self, text):
-        phoneme_ids, clean_text = process_and_phonemize_text(text, self.language)
-        x = torch.LongTensor(phoneme_ids)
-        return x, clean_text
+        phoneme_ids, clean_text = self.text_processor_func(text, self.language)
+        return phoneme_ids, clean_text
 
     def __getitem__(self, index):
-        datapoint = self.get_datapoint(self.filepaths_and_text[index])
+        filepath, text = self.filepaths_and_text[index]
+        datapoint = self.get_datapoint(filepath, text)
         return datapoint
 
     def __len__(self):
@@ -248,7 +266,6 @@ class TextMelBatchCollate:
     def __call__(self, batch):
         B = len(batch)
         y_max_length = max([item["y"].shape[-1] for item in batch])
-        y_max_length = fix_len_compatibility(y_max_length)
         x_max_length = max([item["x"].shape[-1] for item in batch])
         n_feats = batch[0]["y"].shape[-2]
 

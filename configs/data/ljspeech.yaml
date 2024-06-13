@@ -1,6 +1,7 @@
 _target_: leanspeech.dataset.TextMelDataModule
 name: ljspeech
 language: "en-us"
+text_processor: matcha
 train_filelist_path: data/LJSpeech-1.1/train.txt
 valid_filelist_path: data/LJSpeech-1.1/val.txt
 batch_size: 32

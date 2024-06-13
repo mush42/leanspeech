@@ -1,0 +1,2 @@
+kernel_sizes: [3, 5, 7]
+intermediate_dim: 512

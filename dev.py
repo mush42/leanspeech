@@ -11,12 +11,12 @@ from omegaconf import OmegaConf
 from leanspeech.text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
 
 
+# Text processing pipeline
 SENTENCE = "The history of the Galaxy has got a little muddled, for a number of reasons."
 mat_phids, __ = process_and_phonemize_text_matcha(SENTENCE, "en-us")
 print(f"Length of phoneme ids (Matcha): {len(mat_phids)}")
 pip_phids, __ = process_and_phonemize_text_piper(SENTENCE, "en-us")
 print(f"Length of phoneme ids (piper): {len(pip_phids)}")
-
 
 # Config pipeline
 with initialize(version_base=None, config_path="./configs"):

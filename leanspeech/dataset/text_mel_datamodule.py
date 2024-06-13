@@ -167,6 +167,7 @@ class TextMelDataset(torch.utils.data.Dataset):
         else:
             self.data_parameters = {"mel_mean": 0, "mel_std": 1}
         self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         random.seed(seed)
         random.shuffle(self.filepaths_and_text)
 

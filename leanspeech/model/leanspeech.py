@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from ..utils import sequence_mask, denormalize
+from ..utils import sequence_mask, denormalize_mel
 from .base_lightning_module import BaseLightningModule
 from .components.modules import TextEncoder, DurationPredictor, Decoder
 from .components.length_regulator import LengthRegulator
@@ -73,7 +73,7 @@ class LeanSpeech(BaseLightningModule):
         # LR: length regulator
         w = torch.exp(logw)
         w_ceil = torch.ceil(w).long()
-        x, mel_length = self.length_regulator(x, w_ceil, y_lengths)
+        x, mel_length = self.length_regulator(x, w_ceil, y_max_length)
         
         # Decoder
         x = self.decoder(x)
@@ -107,6 +107,6 @@ class LeanSpeech(BaseLightningModule):
         # Decoder
         x = self.decoder(x)
         x = x.permute(0, 2, 1)
-        mel = denormalize(x, self.mel_mean, self.mel_std)
+        mel = denormalize_mel(x, self.mel_mean, self.mel_std)
 
         return mel, w_ceil

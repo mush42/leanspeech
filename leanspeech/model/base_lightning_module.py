@@ -165,7 +165,7 @@ class BaseLightningModule(LightningModule, ABC):
             for i in range(2):
                 x = one_batch["x"][i].unsqueeze(0).to(self.device)
                 x_lengths = one_batch["x_lengths"][i].unsqueeze(0).to(self.device)
-                output = self.synthesise(x[:, :x_lengths], x_lengths)
+                output = self.synthesize(x[:, :x_lengths], x_lengths)
                 mel = output[0]
                 self.logger.experiment.add_image(
                     f"generated_mel/{i}",

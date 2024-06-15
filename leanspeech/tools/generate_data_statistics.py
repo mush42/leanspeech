@@ -11,7 +11,7 @@ from omegaconf import open_dict
 from tqdm.auto import tqdm
 
 from leanspeech.data.text_mel_datamodule import TextMelDataModule
-from leanspeech.utils.logging_utils import pylogger
+from leanspeech.utils import pylogger
 
 log = pylogger.get_pylogger(__name__)
 
@@ -87,7 +87,6 @@ def main():
         cfg["batch_size"] = args.batch_size
         cfg["train_filelist_path"] = str(os.path.join(root_path, cfg["train_filelist_path"]))
         cfg["valid_filelist_path"] = str(os.path.join(root_path, cfg["valid_filelist_path"]))
-        cfg["load_durations"] = False
 
     text_mel_datamodule = TextMelDataModule(**cfg)
     text_mel_datamodule.setup()

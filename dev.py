@@ -1,5 +1,6 @@
 """Module used during model development."""
 
+import sys
 import time
 import torch
 from lightning.pytorch.utilities.model_summary import summarize
@@ -15,8 +16,9 @@ from leanspeech.text import process_and_phonemize_text_matcha, process_and_phone
 SENTENCE = "The history of the Galaxy has got a little muddled, for a number of reasons."
 mat_phids, __ = process_and_phonemize_text_matcha(SENTENCE, "en-us")
 print(f"Length of phoneme ids (Matcha): {len(mat_phids)}")
-pip_phids, __ = process_and_phonemize_text_piper(SENTENCE, "en-us")
-print(f"Length of phoneme ids (piper): {len(pip_phids)}")
+if sys.platform != 'win32':
+    pip_phids, __ = process_and_phonemize_text_piper(SENTENCE, "en-us")
+    print(f"Length of phoneme ids (piper): {len(pip_phids)}")
 
 # Config pipeline
 with initialize(version_base=None, config_path="./configs"):
@@ -28,8 +30,9 @@ with initialize(version_base=None, config_path="./configs"):
     )
 
 # Dataset pipeline
+dataset_cfg.data.batch_size = 1
+dataset_cfg.data.num_workers = 0
 dataset_cfg.data.seed = 42
-dataset_cfg.data.cache_dir = "_dataset_cache"
 dataset = hydra.utils.instantiate(dataset_cfg.data)
 dataset.setup()
 vd = dataset.val_dataloader()
@@ -49,6 +52,9 @@ y = torch.rand(1, 80, 125)
 y_lengths = torch.LongTensor([y.shape[-1]])
 durations = torch.rand(1, x.size(1))
 train_out = model(x, x_lengths, y, y_lengths, durations)
+
+# Training loop
+step_out = model.training_step(batch, 0)
 
 # Inference
 t0 = time.perf_counter()

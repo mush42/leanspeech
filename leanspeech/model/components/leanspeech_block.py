@@ -16,8 +16,9 @@ class LeanSpeechBlock(nn.Module):
         intermediate_dim = intermediate_dim or dim
         layer_scale_init_value = 1 / num_conv_layers
         self.lstm = nn.LSTM(
-            dim, dim // 2, num_layers=2, batch_first=True, bidirectional=True, dropout=0.1
+            dim, dim // 2, num_layers=2, batch_first=True, bidirectional=True
         )
+        self.lstm_dropout = nn.Dropout(0.1)
         self.convs = nn.ModuleList()
         for __ in range(num_conv_layers):
             self.convs.append(
@@ -32,6 +33,7 @@ class LeanSpeechBlock(nn.Module):
 
     def forward(self, x):
         lstm_out, lstm_state = self.lstm(x)
+        lstm_out = self.lstm_dropout(lstm_out)
         conv_out = x.permute(0, 2, 1)
         for conv in self.convs:
             conv_out = conv(conv_out)

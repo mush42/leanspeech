@@ -1,13 +1,10 @@
-import re
-import unicodedata
 from typing import List, Tuple
 
-from piper_phonemize import phonemize_espeak, phoneme_ids_espeak
+from piper_phonemize import phonemize_espeak
 
-from . import matcha_processor
 from ..utils import intersperse
-
-WHITESPACE_RE = re.compile(r"\s+")
+from . import matcha_processor
+from .textnorm import collapse_whitespace, preprocess_text
 
 
 def process_and_phonemize_text_matcha(text: str, lang: str) -> Tuple[List[int], str]:
@@ -21,6 +18,8 @@ def process_and_phonemize_text_matcha(text: str, lang: str) -> Tuple[List[int], 
 
 
 def process_and_phonemize_text_piper(text: str, lang: str) -> Tuple[List[int], str]:
+    from piper_phonemize import phoneme_ids_espeak
+
     phonemes = phonemize_text(text, lang)
     phoneme_ids = phoneme_ids_espeak(phonemes)
     return phoneme_ids, text
@@ -38,14 +37,4 @@ def phonemize_text(text: str, lang: str) -> str:
     ]
     return phonemes
 
-
-def preprocess_text(text: str) -> str:
-    text = unicodedata.normalize("NFD", text)
-    text = collapse_whitespace(text)
-    return text
-
-
-def collapse_whitespace(text):
-    text = re.sub(WHITESPACE_RE, " ", text)
-    return text
 

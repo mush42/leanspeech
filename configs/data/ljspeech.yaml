@@ -2,8 +2,8 @@ _target_: leanspeech.dataset.TextMelDataModule
 name: ljspeech
 language: "en-us"
 text_processor: matcha
-train_filelist_path: data/LJSpeech-1.1/train.txt
-valid_filelist_path: data/LJSpeech-1.1/val.txt
+train_filelist_path: data/ljspeech/train.txt
+valid_filelist_path: data/ljspeech/val.txt
 batch_size: 32
 num_workers: 20
 pin_memory: True
@@ -17,5 +17,4 @@ f_max: 8000
 data_statistics:  # Computed for ljspeech dataset
   mel_mean: -5.536622
   mel_std: 2.116101
-cache_dir: ${paths.output_dir}/_data_cache
 seed: ${seed}

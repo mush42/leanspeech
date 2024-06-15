@@ -1,7 +1,9 @@
 # coding: utf-8
-
 import re
 from unidecode import unidecode
+
+from .textnorm import collapse_whitespace
+
 
 _pad = "_"
 _punctuation = ';:,.!?¡¿—…"«»“” '
@@ -20,9 +22,6 @@ SPACE_ID = symbols.index(" ")
 # Mappings from symbol to numeric ID and vice versa:
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
 _id_to_symbol = {i: s for i, s in enumerate(symbols)}  # pylint: disable=unnecessary-comprehension
-
-# Regular expression matching whitespace:
-_whitespace_re = re.compile(r"\s+")
 
 # List of (regular expression, replacement) pairs for abbreviations:
 _abbreviations = [
@@ -82,10 +81,6 @@ def expand_abbreviations(text):
 
 def lowercase(text):
     return text.lower()
-
-
-def collapse_whitespace(text):
-    return re.sub(_whitespace_re, " ", text)
 
 
 def convert_to_ascii(text):

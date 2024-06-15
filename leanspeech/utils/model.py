@@ -73,7 +73,7 @@ def duration_loss(logw, logw_, lengths):
     return loss
 
 
-def normalize(data, mu, std):
+def normalize_mel(data, mu, std):
     if not isinstance(mu, (float, int)):
         if isinstance(mu, list):
             mu = torch.tensor(mu, dtype=data.dtype, device=data.device)
@@ -95,7 +95,7 @@ def normalize(data, mu, std):
     return (data - mu) / std
 
 
-def denormalize(data, mu, std):
+def denormalize_mel(data, mu, std):
     if not isinstance(mu, float):
         if isinstance(mu, list):
             mu = torch.tensor(mu, dtype=data.dtype, device=data.device)

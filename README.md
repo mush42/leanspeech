@@ -69,7 +69,7 @@ Since this code uses [Lightning-Hydra-Template](https://github.com/ashleve/light
 
 ### Approach
 
-LeanSpeech is trained using a **knowledge distilation** approach. A data augmentation approach is used, whereby ground truth data and **synthetic* * data obtained from a powerful acoustic model are jointly used to train the model.
+LeanSpeech is trained using a **knowledge distilation** approach. A data augmentation approach is used, whereby ground truth data and **synthetic** data obtained from a powerful acoustic model are jointly used to train the model.
 
 ### Data preparation
 

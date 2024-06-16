@@ -180,8 +180,6 @@ Repositories I would like to acknowledge:
   booktitle={ICASSP 2023 - 2023 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)}, 
   title={LeanSpeech: The Microsoft Lightweight Speech Synthesis System for Limmits Challenge 2023}, 
   year={2023},
-  volume={},
-  number={},
   pages={1-2},
   keywords={Training;Convolution;Vocoders;Acoustics;Speech synthesis;Text to Speech;Lightweight;Multi-speaker;Multi-lingual;WaveGlow},
   doi={10.1109/ICASSP49357.2023.10096039}}

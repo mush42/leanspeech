@@ -2,14 +2,48 @@
 
 Unofficial pytorch implementation of [LeanSpeech: The Microsoft Lightweight Speech Synthesis System for Limmits Challenge 2023](https://ieeexplore.ieee.org/document/10096039).
 
+**LeanSpeech** is ment to be an ultra **efficient**, **lightweight** and **fast** acoustic model for **on-device** text-to-speech.
+
 ## Installation
 
 ```bash
+$ git clone https://github.com/mush42/leanspeech
+$ cd leanspeech
+$ python3 -m venv .venv
+$ source .venv/bin/activate
 $ pip3 install --upgrade pip setuptools wheels
 $ pip3 install -r requirements.txt
 ```
 
 ## Inference
+
+### Command line API
+
+```bash
+$ python3 -m leanspeech.infer  --help
+usage: infer.py [-h] [-l LANG] [--length-scale LENGTH_SCALE] [-t {matcha,piper}] [--sr SR] [--hop HOP] [--cuda]
+                checkpoint text output_dir
+
+Synthesizing text using LeanSpeech.
+
+positional arguments:
+  checkpoint            Path to LeanSpeech checkpoint
+  text                  Text to synthesize
+  output_dir            Directory to write generated mel to.
+
+options:
+  -h, --help            show this help message and exit
+  -l LANG, --lang LANG  Language to use for tokenization.
+  --length-scale LENGTH_SCALE
+                        Length scale to control speech rate.
+  -t {matcha,piper}, --tokenizer {matcha,piper}
+                        Text tokenizer
+  --sr SR               Mel spectogram sampleing rate
+  --hop HOP             Mel spectogram hop-length
+  --cuda                Use GPU for inference
+```
+
+### Python API
 
 ```python
 from leanspeech.model import LeanSpeech
@@ -84,11 +118,60 @@ To start training you can run the following command. Note that this training run
 $ python3 -m leanspeech.train experiment=hfc_female-en_US
 ``` 
 
+## ONNX support
+
+### ONNX export
+
+```bash
+$ python3 -m leanspeech.onnx.export --help
+usage: export.py [-h] [--opset OPSET] [--seed SEED] checkpoint_path output
+
+Export LeanSpeech checkpoints to ONNX
+
+positional arguments:
+  checkpoint_path  Path to the model checkpoint
+  output           Path to output `.onnx` file
+
+options:
+  -h, --help       show this help message and exit
+  --opset OPSET    ONNX opset version to use (default 15
+  --seed SEED      Random seed
+```
+
+### ONNX inference
+
+```bash
+$ python3 -m leanspeech.onnx.infer --help
+usage: infer.py [-h] [-l LANG] [--length-scale LENGTH_SCALE] [-t {matcha,piper}] [--sr SR] [--hop HOP]
+                [-voc VOCODER] [--cuda]
+                onnx_path text output_dir
+
+ONNX inference of LeanSpeech
+
+positional arguments:
+  onnx_path             Path to the exported LeanSpeech ONNX model
+  text                  Text to synthesize
+  output_dir            Directory to write generated mel and/or audio to.
+
+options:
+  -h, --help            show this help message and exit
+  -l LANG, --lang LANG  Language to use for tokenization.
+  --length-scale LENGTH_SCALE
+                        Length scale to control speech rate.
+  -t {matcha,piper}, --tokenizer {matcha,piper}
+                        Text tokenizer
+  --sr SR               Mel spectogram sampleing rate
+  --hop HOP             Mel spectogram hop-length
+  -voc VOCODER, --vocoder VOCODER
+                        Path to vocoder ONNX model
+  --cuda                Use GPU for inference
+```
+
 ## Acknowledgements
 
-Other source code I would like to acknowledge:
+Repositories I would like to acknowledge:
 
-- [Matcha-TTS](https://github.com/shivammehta25/Matcha-TTS): For the repo template and phoneme alignment code.
+- [Matcha-TTS](https://github.com/shivammehta25/Matcha-TTS): For the repo backbone and phoneme alignment code.
 - [Piper-TTS](https://github.com/rhasspy/piper): For leading the charge in on-device TTS. Also for the great phonemizer.
 - [Vocos](https://github.com/gemelo-ai/vocos/): For pioneering the use of ConvNext in TTS
 

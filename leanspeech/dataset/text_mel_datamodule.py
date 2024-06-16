@@ -12,9 +12,9 @@ import torchaudio as ta
 from lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
-from ..text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
-from ..utils import normalize_mel
-from ..utils.audio import mel_spectrogram
+from leanspeech.text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
+from leanspeech.utils import normalize_mel, fix_len_compatibility
+from leanspeech.utils.audio import mel_spectrogram
 
 
 def parse_filelist(filelist_path):
@@ -247,6 +247,7 @@ class TextMelBatchCollate:
     def __call__(self, batch):
         B = len(batch)
         y_max_length = max([item["y"].shape[-1] for item in batch])
+        # y_max_length = fix_len_compatibility(y_max_length)
         x_max_length = max([item["x"].shape[-1] for item in batch])
         n_feats = batch[0]["y"].shape[-2]
 
@@ -264,8 +265,7 @@ class TextMelBatchCollate:
             x[i, : x_.shape[-1]] = x_
             filepaths.append(item["filepath"])
             x_texts.append(item["x_text"])
-            if item["durations"] is not None:
-                durations[i, : item["durations"].shape[-1]] = item["durations"]
+            durations[i, :item["durations"].shape[-1]] = item["durations"]
 
         y_lengths = torch.tensor(y_lengths, dtype=torch.long)
         x_lengths = torch.tensor(x_lengths, dtype=torch.long)
@@ -277,5 +277,5 @@ class TextMelBatchCollate:
             "y_lengths": y_lengths,
             "filepaths": filepaths,
             "x_texts": x_texts,
-            "durations": durations if not torch.eq(durations, 0).all() else None,
+            "durations": durations,
         }

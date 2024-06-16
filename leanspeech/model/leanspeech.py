@@ -1,11 +1,10 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 from ..utils import sequence_mask, denormalize_mel
 from .base_lightning_module import BaseLightningModule
-from .components.modules import TextEncoder, DurationPredictor, Decoder
-from .components.length_regulator import LengthRegulator
-from .components.losses import DurationPredictorLoss
+from .components.modules import TextEncoder, DurationPredictor, Decoder, LengthRegulator
 
 
 class LeanSpeech(BaseLightningModule):
@@ -26,21 +25,20 @@ class LeanSpeech(BaseLightningModule):
         self.encoder = TextEncoder(
             n_vocab=n_vocab,
             dim=dim,
-            kernel_sizes=encoder.kernel_sizes,
+            layers=encoder.layers,
             intermediate_dim=encoder.intermediate_dim
         )
         self.duration_predictor = DurationPredictor(
             dim=dim,
-            kernel_sizes=duration_predictor.kernel_sizes,
+            layers=duration_predictor.layers,
         )
         self.length_regulator = LengthRegulator()
         self.decoder = Decoder(
             n_mel_channels=n_feats,
             dim=dim,
-            kernel_sizes=decoder.kernel_sizes,
+            layers=decoder.layers,
             intermediate_dim=decoder.intermediate_dim
         )
-        self.duration_loss = DurationPredictorLoss()
         self.update_data_statistics(data_statistics)
 
     def forward(self, x, x_lengths, y, y_lengths, durations,):
@@ -54,10 +52,15 @@ class LeanSpeech(BaseLightningModule):
                 shape: (batch_size, n_feats, max_mel_length)
             y_lengths (torch.Tensor): lengths of mel-spectrograms in batch.
                 shape: (batch_size,)
+            durations (torch.Tensor): lengths of mel-spectrograms in batch.
+                shape: (batch_size, max_text_length)
+
         Returns:
-            loss (torch.Tensor): total loss
             mel (torch.Tensor): predicted mel spectogram
-                shape: (batch_size, n_timesteps, mel_feats)
+                shape: (batch_size, mel_feats, n_timesteps)
+            loss: (torch.Tensor): scaler representing total loss
+            dur_loss: (torch.Tensor): scaler representing durations loss
+            mel_loss: (torch.Tensor): scaler representing mel spectogram loss
         """
         x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.size(1)), 1).to(x.dtype)
         y_max_length = y_lengths.max()
@@ -68,45 +71,59 @@ class LeanSpeech(BaseLightningModule):
 
         # Duration predictor
         logw= self.duration_predictor(x, x_mask)
-        dur_loss = self.duration_loss(logw.squeeze(2), durations, x_mask)
 
-        # LR: length regulator
-        w = torch.exp(logw)
-        w_ceil = torch.ceil(w).long()
-        x, mel_length = self.length_regulator(x, w_ceil, y_max_length)
-        
+        # Length regulator
+        x, dur_loss, attn = self.length_regulator(x, x_lengths, x_mask, y, y_lengths, y_mask, logw, durations)
+
         # Decoder
-        x = self.decoder(x)
-        pred_mel = x.permute(0, 2, 1)
+        mel = self.decoder(x) * y_mask
 
         # Mel loss
         mel_mask = y_mask.bool()
+        pred_mel = mel.masked_select(mel_mask)
         target = y.masked_select(mel_mask)
-        pred = pred_mel.masked_select(mel_mask)
-        mel_loss = nn.L1Loss()(pred, target)
+        mel_loss = F.mse_loss(pred_mel, target)
 
         # Total loss
         loss = dur_loss + mel_loss
 
-        return pred_mel, loss, dur_loss, mel_loss
+        return mel, loss, dur_loss, mel_loss
 
     @torch.inference_mode()
     def synthesize(self, x, x_lengths, length_scale=1.0):
+        """
+        Args:
+            x (torch.Tensor): batch of texts, converted to a tensor with phoneme embedding ids.
+                shape: (batch_size, max_text_length)
+            x_lengths (torch.Tensor): lengths of texts in batch.
+                shape: (batch_size,)
+            length_scale (torch.Tensor): scaler to control phoneme durations.
+
+        Returns:
+            mel (torch.Tensor): predicted mel spectogram
+                shape: (batch_size, mel_feats, n_timesteps)
+            mel_lengths (torch.Tensor): lengths of generated mel spectograms
+                shape: (batch_size,)
+            w_ceil: (torch.Tensor): predicted phoneme durations
+                shape: (batch_size, max_text_length)
+        """
         x_mask = torch.unsqueeze(sequence_mask(x_lengths, x.size(1)), 1).to(x.dtype)
+
         # Encoder
         x = self.encoder(x, x_lengths)
 
         # Duration predictor
         logw= self.duration_predictor(x, x_mask)
 
-        # LR: length regulator
-        w = torch.exp(logw)
-        w_ceil = torch.ceil(w).long()
-        x, mel_length = self.length_regulator(x, w_ceil)
+        # length regulator
+        w_ceil, y, y_lengths, y_mask = self.length_regulator.infer(x, x_mask, logw, length_scale)
 
         # Decoder
-        x = self.decoder(x)
-        x = x.permute(0, 2, 1)
-        mel = denormalize_mel(x, self.mel_mean, self.mel_std)
+        x = self.decoder(y) * y_mask
 
-        return mel, w_ceil
+        # Prepare outputs
+        mel = denormalize_mel(x, self.mel_mean, self.mel_std)
+        mel_lengths = y_lengths
+        w_ceil = w_ceil.squeeze(1)
+
+        return mel, mel_lengths, w_ceil

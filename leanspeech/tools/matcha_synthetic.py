@@ -1,6 +1,8 @@
 import argparse
 import itertools
 import json
+import os
+import random
 from pathlib import Path
 
 import numpy as np
@@ -109,6 +111,9 @@ def main():
     parser.add_argument(
         "--length-scale", type=float, default=1.0, help="Matcha temperature."
     )
+    parser.add_argument(
+        "--val-percent", type=float, default=0.05, help="Percentage of sentences for validation"
+    )
 
     args = parser.parse_args()
 
@@ -174,13 +179,33 @@ def main():
                 json.dump(j, file, ensure_ascii=False)
             mel = normalize_mel(m, args.mel_mean, args.mel_std)
             np.save(out_mel, mel, allow_pickle=False)
-            np.save(out_dur, d, allow_pickle=False)
+            np.save(out_dur, d.squeeze(), allow_pickle=False)
 
     log.info(f"Total mel lengths: {total_mel_len} frames")
 
+    random.shuffle(filelist)
+    val_limit = int(len(filelist) * args.val_percent)
+    train_split = filelist[val_limit:]
+    val_split = filelist[:val_limit]
     with open(output_dir.joinpath("filelist.txt"), "w", encoding="utf-8") as file:
         file.write("\n".join(filelist))
         log.info(f"Wrote filelist to `filelist.txt`")
+
+    with open(output_dir.joinpath("train.txt"), "w", encoding="utf-8") as file:
+        train_filepaths = [
+            os.fspath(data_output_dir.joinpath(fname))
+            for fname in train_split
+        ]
+        file.write("\n".join(train_filepaths))
+        log.info(f"Wrote file paths to `train.txt`")
+
+    with open(output_dir.joinpath("val.txt"), "w", encoding="utf-8") as file:
+        val_filepaths = [
+            os.fspath(data_output_dir.joinpath(fname))
+            for fname in val_split
+        ]
+        file.write("\n".join(val_filepaths))
+        log.info(f"Wrote file paths to `val.txt`")
 
     log.info(f"Wrote dataset to {args.output_directory}")
 

@@ -22,7 +22,7 @@ if sys.platform != 'win32':
 
 # Config pipeline
 with initialize(version_base=None, config_path="./configs"):
-    dataset_cfg = compose(config_name="data/ljspeech.yaml")
+    dataset_cfg = compose(config_name="data/hfc_female-en_US.yaml")
     cfg = compose(config_name="model/leanspeech.yaml")
     cfg.model.data_statistics = dict(
         mel_mean=-6.38385,
@@ -51,14 +51,15 @@ x_lengths = torch.LongTensor([x.shape[-1]])
 y = torch.rand(1, 80, 125)
 y_lengths = torch.LongTensor([y.shape[-1]])
 durations = torch.rand(1, x.size(1))
-train_out = model(x, x_lengths, y, y_lengths, durations)
+mel, loss, dur_loss, mel_loss = model(x, x_lengths, y, y_lengths, durations)
 
 # Training loop
 step_out = model.training_step(batch, 0)
 
+
 # Inference
 t0 = time.perf_counter()
-mel, w_ceil = model.synthesize(x, x_lengths)
+mel, mel_lengths, w_ceil = model.synthesize(x, x_lengths)
 t_infer = (time.perf_counter() - t0) * 1000
 t_audio = (mel.shape[-1] * 256) / 22.05
 rtf = t_infer / t_audio

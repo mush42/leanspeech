@@ -1,6 +1,6 @@
 ## LeanSpeech
 
-Unofficial pytorch implementation of [LeanSpeech: The Microsoft Lightweight Speech Synthesis System for Limmits Challenge 2023](https://ieeexplore.ieee.org/document/10096039).
+Unofficial pytorch implementation of [LeanSpeech: The Microsoft Lightweight Speech Synthesis System for Limmits Challenge 2023](https://ieeexplore.ieee.org/document/10096039)
 
 **LeanSpeech** is ment to be an ultra **efficient**, **lightweight** and **fast** acoustic model for **on-device** text-to-speech.
 
@@ -21,10 +21,8 @@ $ pip3 install -r requirements.txt
 
 ```bash
 $ python3 -m leanspeech.infer  --help
-usage: infer.py [-h] [-l LANG] [--length-scale LENGTH_SCALE] [-t {matcha,piper}] [--sr SR] [--hop HOP] [--cuda]
-                checkpoint text output_dir
-
-Synthesizing text using LeanSpeech.
+usage: infer.py [-h] [--length-scale LENGTH_SCALE] [--cuda] checkpoint text output_dir
+Synthesizing text using LeanSpeech
 
 positional arguments:
   checkpoint            Path to LeanSpeech checkpoint
@@ -33,13 +31,8 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  -l LANG, --lang LANG  Language to use for tokenization.
   --length-scale LENGTH_SCALE
                         Length scale to control speech rate.
-  -t {matcha,piper}, --tokenizer {matcha,piper}
-                        Text tokenizer
-  --sr SR               Mel spectogram sampleing rate
-  --hop HOP             Mel spectogram hop-length
   --cuda                Use GPU for inference
 ```
 
@@ -55,7 +48,7 @@ model = LeanSpeech.load_from_checkpoint(ckpt_path, map_location="cpu")
 
 # Text preprocessing and phonemization
 sentence = "A rainbow is a meteorological phenomenon that is caused by reflection, refraction and dispersion of light in water droplets resulting in a spectrum of light appearing in the sky."
-phoneme_ids, cleaned_text = process_and_phonemize_text_matcha(SENTENCE, "en-us")
+phoneme_ids, cleaned_text = process_and_phonemize_text_matcha(sentence, "en-us")
 
 # Inference
 x = torch.LongTensor([phoneme_ids])

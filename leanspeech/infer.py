@@ -5,14 +5,27 @@ from time import perf_counter
 
 import numpy as np
 import torch
+import soundfile as sf
 from torch.nn.utils.rnn import pad_sequence, unpad_sequence
 
+from leanspeech.hifigan.config import v1
+from leanspeech.hifigan.env import AttrDict
+from leanspeech.hifigan.models import Generator as HiFiGAN
 from leanspeech.model import LeanSpeech
 from leanspeech.text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
 from leanspeech.utils import pylogger, plot_spectrogram_to_numpy
 
 
 log = pylogger.get_pylogger(__name__)
+
+
+def load_hifigan(checkpoint_path, device):
+    h = AttrDict(v1)
+    hifigan = HiFiGAN(h).to(device)
+    hifigan.load_state_dict(torch.load(checkpoint_path, map_location=device)["generator"])
+    _ = hifigan.eval()
+    hifigan.remove_weight_norm()
+    return hifigan
 
 
 def main():
@@ -30,6 +43,7 @@ def main():
         help="Directory to write generated mel  to.",
     )
     parser.add_argument("--length-scale", type=float, default=1.0, help="Length scale to control speech rate.")
+    parser.add_argument("--hfg-checkpoint", type=str, default=None, help="HiFiGAN vocoder V1 checkpoint.")
     parser.add_argument("--cuda", action="store_true", help="Use GPU for inference")
 
     args = parser.parse_args()
@@ -42,6 +56,9 @@ def main():
     device = torch.device("cuda") if args.cuda else torch.device("cpu")
     model = LeanSpeech.load_from_checkpoint(args.checkpoint, map_location="cpu")
     model.to(device)
+    hfg_vocoder = None
+    if args.hfg_checkpoint is not None:
+        hfg_vocoder = load_hifigan(args.hfg_checkpoint, device)
 
     if tokenizer_name == "matcha":
             tokenizer = process_and_phonemize_text_matcha
@@ -81,10 +98,15 @@ def main():
         outfile = output_dir.joinpath(f"gen-{i + 1}-" + file_hash)
         out_mel = outfile.with_suffix(".mel.npy")
         out_mel_plot = outfile.with_suffix(".png")
+        out_wav = outfile.with_suffix(".wav")
         mel = mel.detach().cpu().numpy()
         np.save(out_mel, mel, allow_pickle=False)
         plot_spectrogram_to_numpy(mel, out_mel_plot)
         log.info(f"Wrote mel to {out_mel}")
+        aud = hfg_vocoder(torch.from_numpy(mel).unsqueeze(0).to(device))
+        wav = aud.squeeze().detach().cpu().numpy()
+        sf.write(out_wav, wav, sample_rate)
+        log.info(f"Wrote audio to {out_wav}")
 
 
 if __name__ == "__main__":

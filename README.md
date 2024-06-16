@@ -105,11 +105,11 @@ options:
 
 See example [matcha_synthetic](./leanspeech/tools/matcha_synthetic.py) for how to generate a synthetic dataset  from  [Matcha-TTS](https://github.com/shivammehta25/Matcha-TTS) given a list of sentences.
 
+Note: If you have generated a synthetic dataset, you should merge it with ground-truth dataset manually by merging  the content of `train.txt` and `val.txt`.
+
 ### Starting training
 
-If you have generated a synthetic dataset, you should merge it with ground-truth dataset manually by copying the contents of the `data` folder and merging  the content of `train.txt` and `val.txt` changing paths appropriately.
-
-To start training you can run the following command. Note that this training run uses **config** from [hfc_female-en_US](./configs/experiment/hfc_female-en_US.yaml). You can copy and update it with your own config values, and pass the custom config yaml file instead.
+To start training run the following command. Note that this training run uses **config** from [hfc_female-en_US](./configs/experiment/hfc_female-en_US.yaml). You can copy and update it with your own config values, and pass the custom config yaml file instead.
 
 ```bash
 $ python3 -m leanspeech.train experiment=hfc_female-en_US

@@ -168,9 +168,9 @@ options:
 
 Repositories I would like to acknowledge:
 
-- [Matcha-TTS](https://github.com/shivammehta25/Matcha-TTS): For the repo backbone and phoneme alignment code.
+- [Matcha-TTS](https://github.com/shivammehta25/Matcha-TTS): For the repo backbone and phoneme-mel alignment framework.
 - [Piper-TTS](https://github.com/rhasspy/piper): For leading the charge in on-device TTS. Also for the great phonemizer.
-- [Vocos](https://github.com/gemelo-ai/vocos/): For pioneering the use of ConvNext in TTS
+- [Vocos](https://github.com/gemelo-ai/vocos/): For pioneering the use of ConvNext in TTS.
 
 ## Reference
 

@@ -83,7 +83,7 @@ def main():
     t0 = perf_counter()
     mels, mel_lengths, w_ceil = model.synthesize(x, x_lengths)
     t_infer = perf_counter() - t0
-    t_audio = (mel_lengths.sum().item() * hop_length) // (sample_rate / 1000)
+    t_audio = (mel_lengths.sum().item() * hop_length) / sample_rate
     ls_rtf = t_infer / t_audio
     log.info(f"LeanSpeech RTF: {ls_rtf}")
 
@@ -103,10 +103,11 @@ def main():
         np.save(out_mel, mel, allow_pickle=False)
         plot_spectrogram_to_numpy(mel, out_mel_plot)
         log.info(f"Wrote mel to {out_mel}")
-        aud = hfg_vocoder(torch.from_numpy(mel).unsqueeze(0).to(device))
-        wav = aud.squeeze().detach().cpu().numpy()
-        sf.write(out_wav, wav, sample_rate)
-        log.info(f"Wrote audio to {out_wav}")
+        if hfg_vocoder is not None:
+            aud = hfg_vocoder(torch.from_numpy(mel).unsqueeze(0).to(device))
+            wav = aud.squeeze().detach().cpu().numpy()
+            sf.write(out_wav, wav, sample_rate)
+            log.info(f"Wrote audio to {out_wav}")
 
 
 if __name__ == "__main__":

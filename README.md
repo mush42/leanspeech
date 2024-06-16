@@ -29,7 +29,7 @@ Synthesizing text using LeanSpeech
 positional arguments:
   checkpoint            Path to LeanSpeech checkpoint
   text                  Text to synthesize
-  output_dir            Directory to write generated mel to.
+  output_dir            Directory to write generated mel/wav to.
 
 options:
   -h, --help            show this help message and exit

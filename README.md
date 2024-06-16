@@ -21,7 +21,9 @@ $ pip3 install -r requirements.txt
 
 ```bash
 $ python3 -m leanspeech.infer  --help
-usage: infer.py [-h] [--length-scale LENGTH_SCALE] [--cuda] checkpoint text output_dir
+usage: infer.py [-h] [--length-scale LENGTH_SCALE] [--hfg-checkpoint HFG_CHECKPOINT] [--cuda]
+                checkpoint text output_dir
+
 Synthesizing text using LeanSpeech
 
 positional arguments:
@@ -33,6 +35,8 @@ options:
   -h, --help            show this help message and exit
   --length-scale LENGTH_SCALE
                         Length scale to control speech rate.
+  --hfg-checkpoint HFG_CHECKPOINT
+                        HiFiGAN vocoder V1 checkpoint.
   --cuda                Use GPU for inference
 ```
 

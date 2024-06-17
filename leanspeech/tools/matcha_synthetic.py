@@ -132,7 +132,9 @@ def main():
 
     with open(output_dir.joinpath("train.txt"), "w", encoding="utf-8") as file:
         train_filepaths = [
-            os.fspath(data_output_dir.joinpath(fname))
+            os.fspath(
+                data_output_dir.joinpath(fname).absolute()
+            )
             for fname in train_split
         ]
         file.write("\n".join(train_filepaths))
@@ -140,7 +142,9 @@ def main():
 
     with open(output_dir.joinpath("val.txt"), "w", encoding="utf-8") as file:
         val_filepaths = [
-            os.fspath(data_output_dir.joinpath(fname))
+            os.fspath(
+                data_output_dir.joinpath(fname).absolute()
+            )
             for fname in val_split
         ]
         file.write("\n".join(val_filepaths))

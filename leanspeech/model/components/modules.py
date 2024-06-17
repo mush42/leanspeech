@@ -6,7 +6,7 @@ from .leanspeech_block  import LeanSpeechBlock
 
 
 class TextEncoder(nn.Module):
-    def __init__(self, n_vocab, dim, convnext_layers, intermediate_dim=None):
+    def __init__(self, n_vocab, n_feats, dim, convnext_layers, intermediate_dim=None):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, dim, padding_idx=0)
         self.ls_blocks = nn.ModuleList()
@@ -19,11 +19,14 @@ class TextEncoder(nn.Module):
                     intermediate_dim=intermediate_dim
                 )
             )
+        self.proj_m = torch.nn.Conv1d(dim, n_feats, 1)
 
     def forward(self, x, mask):
         x = self.emb(x)
         for ls_block in self.ls_blocks:
             x = ls_block(x)
+        x = x.transpose(1, 2)
+        x = self.proj_m(x)
         return x
 
 
@@ -43,8 +46,10 @@ class DurationPredictor(nn.Module):
         self.proj = torch.nn.Linear(dim, 1)
 
     def forward(self, x, mask):
+        x = x.transpose(1, 2)
+        org_x = x
         for ls_block in self.ls_blocks:
-            x = ls_block(x)
+            x = x + ls_block(org_x)
         x = self.proj(x).transpose(1, 2)
         return x
 
@@ -79,7 +84,6 @@ class LengthRegulator(nn.Module):
         super().__init__()
 
     def forward(self, x, x_lengths, x_mask, y, y_lengths, y_mask, logw, durations):
-        x = x.transpose(1, 2)
         y_max_length = y.shape[-1]
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
         attn = generate_path(durations.squeeze(1), attn_mask.squeeze(1))
@@ -94,7 +98,6 @@ class LengthRegulator(nn.Module):
 
     @torch.inference_mode
     def infer(self, x, x_mask, logw, length_scale=1.0):
-        x = x.transpose(1, 2)
         w = torch.exp(logw) * x_mask
         w_ceil = torch.ceil(w) * length_scale
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()

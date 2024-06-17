@@ -25,18 +25,19 @@ class LeanSpeech(BaseLightningModule):
 
         self.encoder = TextEncoder(
             n_vocab=n_vocab,
+            n_feats=n_feats,
             dim=dim,
             convnext_layers=encoder.convnext_layers,
             intermediate_dim=encoder.intermediate_dim
         )
         self.duration_predictor = DurationPredictor(
-            dim=dim,
+            dim=n_feats,
             convnext_layers=duration_predictor.convnext_layers,
         )
         self.length_regulator = LengthRegulator()
         self.decoder = Decoder(
             n_mel_channels=n_feats,
-            dim=dim,
+            dim=n_feats,
             convnext_layers=decoder.convnext_layers,
             intermediate_dim=decoder.intermediate_dim
         )

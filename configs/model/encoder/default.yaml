@@ -1,2 +1,2 @@
-convnext_layers: [[3, 2], [5, 2], [7, 2]]
+convnext_layers: [[3, 3], [5, 2]]
 intermediate_dim: 320

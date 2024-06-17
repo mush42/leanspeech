@@ -29,10 +29,17 @@ with initialize(version_base=None, config_path="./configs"):
         mel_std=2.541796
     )
 
+
+# Model
+model = hydra.utils.instantiate(cfg.model)
+print(summarize(model))
+
+
 # Dataset pipeline
 dataset_cfg.data.batch_size = 1
 dataset_cfg.data.num_workers = 0
 dataset_cfg.data.seed = 42
+dataset_cfg.data.pin_memory = False
 dataset = hydra.utils.instantiate(dataset_cfg.data)
 dataset.setup()
 td = dataset.train_dataloader()
@@ -42,9 +49,6 @@ print(f"Batch['x'] shape: {batch['x'].shape}")
 print(f"Batch['mel'] shape: {batch['y'].shape}")
 print(f"Batch['durations'] shape: {batch['durations'].shape}")
 
-# Model
-model = hydra.utils.instantiate(cfg.model)
-print(summarize(model))
 
 # Training
 x = batch["x"][0].unsqueeze(0)

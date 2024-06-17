@@ -6,7 +6,7 @@ defaults:
   - optimizer: adam.yaml
 
 _target_: leanspeech.model.leanspeech.LeanSpeech
-dim: 128
+dim: 80
 n_vocab: 178
 n_feats: 80
 loss_weights:

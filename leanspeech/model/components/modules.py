@@ -6,11 +6,11 @@ from .leanspeech_block  import LeanSpeechBlock
 
 
 class TextEncoder(nn.Module):
-    def __init__(self, n_vocab, dim, layers, intermediate_dim=None):
+    def __init__(self, n_vocab, dim, convnext_layers, intermediate_dim=None):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, dim, padding_idx=0)
         self.ls_blocks = nn.ModuleList()
-        for (kernel_size, num_conv_layers) in layers:
+        for (kernel_size, num_conv_layers) in convnext_layers:
             self.ls_blocks.append(
                 LeanSpeechBlock(
                     dim=dim,
@@ -20,7 +20,7 @@ class TextEncoder(nn.Module):
                 )
             )
 
-    def forward(self, x, x_mask):
+    def forward(self, x, mask):
         x = self.emb(x)
         for ls_block in self.ls_blocks:
             x = ls_block(x)
@@ -28,10 +28,10 @@ class TextEncoder(nn.Module):
 
 
 class DurationPredictor(nn.Module):
-    def __init__(self, dim, layers, intermediate_dim=None):
+    def __init__(self, dim, convnext_layers, intermediate_dim=None):
         super().__init__()
         self.ls_blocks = nn.ModuleList()
-        for (kernel_size, num_conv_layers) in layers:
+        for (kernel_size, num_conv_layers) in convnext_layers:
             self.ls_blocks.append(
                 LeanSpeechBlock(
                     dim=dim,
@@ -42,7 +42,7 @@ class DurationPredictor(nn.Module):
             )
         self.proj = torch.nn.Linear(dim, 1)
 
-    def forward(self, x, x_mask):
+    def forward(self, x, mask):
         for ls_block in self.ls_blocks:
             x = ls_block(x)
         x = self.proj(x).transpose(1, 2)
@@ -51,11 +51,11 @@ class DurationPredictor(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(
-        self, n_mel_channels, dim, layers, intermediate_dim=None
+        self, n_mel_channels, dim, convnext_layers, intermediate_dim=None
     ):
         super().__init__()
         self.ls_blocks = nn.ModuleList()
-        for (kernel_size, num_conv_layers) in layers:
+        for (kernel_size, num_conv_layers) in convnext_layers:
             self.ls_blocks.append(
                 LeanSpeechBlock(
                     dim=dim,
@@ -66,7 +66,7 @@ class Decoder(nn.Module):
             )
         self.mel_linear = nn.Linear(dim, n_mel_channels)
 
-    def forward(self, x):
+    def forward(self, x, mask):
         for ls_block in self.ls_blocks:
             x = ls_block(x)
         x = self.mel_linear(x)
@@ -83,13 +83,13 @@ class LengthRegulator(nn.Module):
         y_max_length = y.shape[-1]
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
         attn = generate_path(durations.squeeze(1), attn_mask.squeeze(1))
+        # Align encoded text with mel-spectrogram and get mu_y segment
+        mu_y = torch.matmul(attn.float().transpose(1, 2), x.transpose(1, 2))
+        mu_y = mu_y[:, :y_max_length, :]
+        attn = attn[:, :, :y_max_length]
         # Compute loss between predicted log-scaled durations and the ground truth durations
         logw_gt = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
         dur_loss = duration_loss(logw, logw_gt, x_lengths)
-        # Align encoded text with mel-spectrogram and get mu_y segment
-        mu_y = torch.matmul(attn.float().transpose(1, 2), x.transpose(1, 2))
-        mu_y = mu_y[:, :, :y_max_length]
-        attn = attn[:, :, :y_max_length]
         return mu_y, dur_loss, attn
 
     @torch.inference_mode
@@ -105,6 +105,6 @@ class LengthRegulator(nn.Module):
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
         attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
         mu_y = torch.matmul(attn.float().squeeze(1).transpose(1, 2), x.transpose(1, 2))
-        mel = mu_y[:, :y_max_length, :]
+        y = mu_y[:, :y_max_length, :]
         y_mask = y_mask[:, :, :y_max_length]
-        return w_ceil, mel, y_lengths, y_mask
+        return w_ceil, y, y_lengths, y_mask

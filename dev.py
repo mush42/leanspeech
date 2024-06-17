@@ -35,6 +35,7 @@ dataset_cfg.data.num_workers = 0
 dataset_cfg.data.seed = 42
 dataset = hydra.utils.instantiate(dataset_cfg.data)
 dataset.setup()
+td = dataset.train_dataloader()
 vd = dataset.val_dataloader()
 batch = next(iter(vd))
 print(f"Batch['x'] shape: {batch['x'].shape}")

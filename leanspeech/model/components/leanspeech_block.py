@@ -18,7 +18,6 @@ class LeanSpeechBlock(nn.Module):
         self.lstm = nn.LSTM(
             dim, dim // 2, num_layers=2, batch_first=True, bidirectional=True
         )
-        self.lstm_dropout = nn.Dropout(0.1)
         self.convs = nn.ModuleList()
         for __ in range(num_conv_layers):
             self.convs.append(
@@ -30,25 +29,15 @@ class LeanSpeechBlock(nn.Module):
                     padding=padding
                 )
             )
+        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
         lstm_out, lstm_state = self.lstm(x)
-        lstm_out = self.lstm_dropout(lstm_out)
         conv_out = x.permute(0, 2, 1)
         for conv in self.convs:
             conv_out = conv(conv_out)
         conv_out = conv_out.permute(0, 2, 1)
         x = lstm_out + conv_out
+        x = self.dropout(x)
         return x
 
-if __name__ == '__main__':
-    from ...utils.generic import count_parameters, get_model_size_mb
-
-    dim = 256
-    block = LeanSpeechBlock(dim, 5, 4)
-    block = block.half()
-    print(f"#Params: {count_parameters(block)}")
-    print(f"Size (bytes): {get_model_size_mb(block)}")
-    x = torch.rand(16, 100, dim).half()
-    y = block(x)
-    print(y.shape)

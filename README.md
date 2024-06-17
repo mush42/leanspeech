@@ -4,6 +4,10 @@ Unofficial pytorch implementation of [LeanSpeech: The Microsoft Lightweight Spee
 
 **LeanSpeech** is ment to be an ultra **efficient**, **lightweight** and **fast** acoustic model for **on-device** text-to-speech.
 
+## Disclaimer
+
+This is still WIP. Final model designed decisions are still being made.
+
 ## Installation
 
 ```bash

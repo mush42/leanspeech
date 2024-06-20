@@ -90,7 +90,7 @@ def main():
         None, {"x": x, "x_lengths": x_lengths, "scales": scales}
     )
     t_infer = perf_counter() - t0
-    t_audio = (mel_lengths.sum().item() * args.hop) // (args.sr / 1000)
+    t_audio = (mel_lengths.sum().item() * args.hop) / args.sr
     ls_rtf = t_infer / t_audio
     log.info(f"LeanSpeech RTF: {ls_rtf}")
 

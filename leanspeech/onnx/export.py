@@ -7,10 +7,10 @@ import torch
 from lightning import seed_everything
 
 from leanspeech.model import LeanSpeech
-from leanspeech.utils import pylogger, normalize_mel
+from leanspeech.utils import get_script_logger, normalize_mel
 
 
-log = pylogger.get_pylogger(__name__)
+log = get_script_logger(__name__)
 DEFAULT_OPSET = 16
 DEFAULT_SEED = 1234
 
@@ -33,6 +33,7 @@ def main():
     log.info(f"Loading checkpoint from {args.checkpoint_path}")
     checkpoint_path = Path(args.checkpoint_path)
     model = LeanSpeech.load_from_checkpoint(checkpoint_path, map_location="cpu")
+    model.eval()
 
     dummy_input_length = 50
     x = torch.randint(low=0, high=20, size=(1, dummy_input_length), dtype=torch.long)

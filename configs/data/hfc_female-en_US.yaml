@@ -8,8 +8,8 @@ name: hi-fi_en-US_female
 language: "en-us"
 train_filelist_path: data/hfc_female-en_US/train.txt
 valid_filelist_path: data/hfc_female-en_US/val.txt
-batch_size: 24
-num_workers: 6
+batch_size: 16
+num_workers: 4
 data_statistics:  # Computed for this dataset
   mel_mean: -6.38385
   mel_std: 2.541796

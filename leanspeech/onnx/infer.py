@@ -7,10 +7,10 @@ import onnxruntime
 import soundfile as sf
 
 from leanspeech.text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
-from leanspeech.utils import pylogger, plot_spectrogram_to_numpy, numpy_pad_sequences, numpy_unpad_sequences
+from leanspeech.utils import get_script_logger, plot_spectrogram_to_numpy, numpy_pad_sequences, numpy_unpad_sequences
 
 
-log = pylogger.get_pylogger(__name__)
+log = get_script_logger(__name__)
 ONNX_CUDA_PROVIDERS = [
     ("CUDAExecutionProvider", {"cudnn_conv_algo_search": "DEFAULT"}),
     "CPUExecutionProvider"
@@ -22,9 +22,15 @@ def vocode_and_write_wav(mel, vocoder_model, sample_rate, out_wav):
     if vocoder_model is None:
         return
     v_input_feed = vocoder_model.get_inputs()[0].name
+    t0 = perf_counter()
     aud = vocoder_model.run(None, {v_input_feed: mel})[0]
+    t_infer = perf_counter() - t0
+    t_aud = aud.shape[-1] / sample_rate
+    voc_rtf = t_infer / t_aud
+    log.info(f"Vocoder RTF: {voc_rtf}")
     aud = aud.squeeze()
     sf.write(out_wav, aud, sample_rate)
+    log.info(f"Wrote wav to: `{out_wav}`")
 
 
 def main():

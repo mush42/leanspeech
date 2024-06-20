@@ -11,9 +11,9 @@ from omegaconf import open_dict
 from tqdm.auto import tqdm
 
 from leanspeech.data.text_mel_datamodule import TextMelDataModule
-from leanspeech.utils import pylogger
+from leanspeech.utils import get_script_logger
 
-log = pylogger.get_pylogger(__name__)
+log = get_script_logger(__name__)
 
 
 def compute_data_statistics(data_loader: torch.utils.data.DataLoader, out_channels: int):

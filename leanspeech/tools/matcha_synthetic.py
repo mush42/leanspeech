@@ -12,10 +12,10 @@ from more_itertools import chunked
 from tqdm import tqdm
 
 from leanspeech.text import process_and_phonemize_text_matcha
-from leanspeech.utils import pylogger, normalize_mel, numpy_pad_sequences, numpy_unpad_sequences
+from leanspeech.utils import get_script_logger, normalize_mel, numpy_pad_sequences, numpy_unpad_sequences
 
 
-log = pylogger.get_pylogger(__name__)
+log = get_script_logger(__name__)
 
 
 ONNX_CUDA_PROVIDERS = [

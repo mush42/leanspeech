@@ -9,11 +9,11 @@ import hydra
 import rootutils
 from hydra import compose, initialize
 from leanspeech.dataset import TextMelDataset
-from leanspeech.utils import pylogger
+from leanspeech.utils import get_script_logger
 from tqdm import tqdm
 
 
-log = pylogger.get_pylogger(__name__)
+log = get_script_logger(__name__)
 
 
 def write_data(data_dir, file_stem, data):

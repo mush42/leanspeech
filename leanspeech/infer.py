@@ -56,6 +56,7 @@ def main():
     device = torch.device("cuda") if args.cuda else torch.device("cpu")
     model = LeanSpeech.load_from_checkpoint(args.checkpoint, map_location="cpu")
     model.to(device)
+    model.eval()
     hfg_vocoder = None
     if args.hfg_checkpoint is not None:
         hfg_vocoder = load_hifigan(args.hfg_checkpoint, device)

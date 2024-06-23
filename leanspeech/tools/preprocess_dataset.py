@@ -106,17 +106,20 @@ def main():
             inrows = list(reader)
         log.info(f"Found {len(inrows)} utterances in file.")
         wav_path = root.joinpath("wav")
-        out_rows = []
+        out_filelist = []
         for (filestem, text) in tqdm(inrows, total=len(inrows), desc="processing", unit="utterance"):
             audio_path = wav_path.joinpath(filestem + ".wav")
             audio_path = audio_path.resolve()
             data = dataset.preprocess_utterance(audio_path, text)
             write_data(data_dir, audio_path.stem, data)
-            out_rows.append((filestem, text.strip()))
+            out_filelist.append(data_dir.joinpath(filestem))
         out_txt = output_dir.joinpath(out_filename)
         with open(out_txt, "w", encoding="utf-8", newline="\n") as file:
-            writer = csv.writer(file, delimiter="|")
-            writer.writerows(out_rows)
+            filelist = [
+                os.fspath(fn.resolve())
+                for fs in out_filelist
+            ]
+            file.write("\n".join(filelist))
         log.info(f"Wrote file: {out_txt}")
 
     log.info("Process done!")

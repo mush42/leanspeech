@@ -34,12 +34,11 @@ class BaseLightningModule(LightningModule, ABC):
         if self.hparams.scheduler not in (None, {}):
             scheduler_args = {}
             # Manage last epoch for exponential schedulers
+            current_epoch = -1
             if "last_epoch" in inspect.signature(self.hparams.scheduler.scheduler).parameters:
                 if hasattr(self, "ckpt_loaded_epoch"):
                     current_epoch = self.ckpt_loaded_epoch - 1
-                else:
-                    current_epoch = -1
-
+    
             scheduler_args.update({"optimizer": optimizer})
             scheduler = self.hparams.scheduler.scheduler(**scheduler_args)
             scheduler.last_epoch = current_epoch
@@ -47,9 +46,10 @@ class BaseLightningModule(LightningModule, ABC):
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
-                    "interval": self.hparams.scheduler.lightning_args.interval,
-                    "frequency": self.hparams.scheduler.lightning_args.frequency,
-                    "name": "learning_rate",
+                    "monitor": "loss/val_epoch",
+                    # "interval": self.hparams.scheduler.lightning_args.interval,
+                    # "frequency": self.hparams.scheduler.lightning_args.frequency,
+                    # "name": "learning_rate",
                 },
             }
 

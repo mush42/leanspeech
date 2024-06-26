@@ -55,8 +55,8 @@ x = batch["x"][0].unsqueeze(0)
 x_lengths = torch.LongTensor([x.shape[-1]])
 y = torch.rand(1, 80, 125)
 y_lengths = torch.LongTensor([y.shape[-1]])
-durations = torch.rand(1, x.size(1))
-mel, loss, dur_loss, mel_loss = model(x, x_lengths, y, y_lengths, durations)
+durations = torch.randint(1, 2, (1, x.size(1)))
+outputs = model(x, x_lengths, y, y_lengths, durations)
 
 # Training loop
 step_out = model.training_step(batch, 0)
@@ -64,7 +64,8 @@ step_out = model.training_step(batch, 0)
 
 # Inference
 t0 = time.perf_counter()
-mel, mel_lengths, w_ceil = model.synthesize(x, x_lengths)
+outputs = model.synthesize(x, x_lengths)
+mel = outputs["mel"]
 t_infer = (time.perf_counter() - t0) * 1000
 t_audio = (mel.shape[-1] * 256) / 22.05
 rtf = t_infer / t_audio

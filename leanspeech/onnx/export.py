@@ -58,8 +58,14 @@ def main():
     # Create the output directory (if not exists)
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
 
-    dummy_input = [x, x_lengths, scales]
-    model.forward = lambda inputs: model.synthesize(inputs[0], inputs[1], inputs[2])
+    dummy_input = (x, x_lengths, scales)
+
+    def _infer_forward(x, x_lengths, scales):
+        length_scale = scales[0]
+        outputs = model.synthesize(x, x_lengths, length_scale)
+        return outputs["mel"], outputs["mel_lengths"], outputs["w_ceil"]
+
+    model.forward = _infer_forward
     model.to_onnx(
         args.output,
         dummy_input,

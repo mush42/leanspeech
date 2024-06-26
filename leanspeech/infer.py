@@ -82,8 +82,11 @@ def main():
     scales = torch.Tensor([args.length_scale]).to(device)
 
     t0 = perf_counter()
-    mels, mel_lengths, w_ceil = model.synthesize(x, x_lengths)
+    outputs = model.synthesize(x, x_lengths)
     t_infer = perf_counter() - t0
+    mels = outputs["mel"]
+    mel_lengths = outputs["mel_lengths"]
+    w_ceil = outputs["w_ceil"]
     t_audio = (mel_lengths.sum().item() * hop_length) / sample_rate
     ls_rtf = t_infer / t_audio
     log.info(f"LeanSpeech RTF: {ls_rtf}")

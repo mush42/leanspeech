@@ -7,10 +7,10 @@ defaults:
   - scheduler: default.yaml
 
 _target_: leanspeech.model.leanspeech.LeanSpeech
-dim: 80
+dim: 128
 n_vocab: 178
 n_feats: 80
 loss_weights:
-  mel: 10.0
+  mel: 5.0
   duration: 1.0
 data_statistics: ${data.data_statistics}

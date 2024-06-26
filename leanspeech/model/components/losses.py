@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.nn import functional as F
 
 
@@ -9,72 +9,112 @@ class DurationPredictorLoss(torch.nn.Module):
     The loss value is Calculated in log domain to make it Gaussian.
     """
 
-    def __init__(self, offset=1.0, reduction="none"):
+    def __init__(self, clip_val: float = 1e-7, reduction: str="none"):
         """
         Args:
-            offset (float, optional): Offset value to avoid nan in log domain.
+            clip_val (float, optional): Offset value to avoid nan in log domain.
             reduction (str): Reduction type in loss calculation.
         """
         super(DurationPredictorLoss, self).__init__()
         self.criterion = torch.nn.MSELoss(reduction=reduction)
-        self.offset = offset
+        self.clip_val = clip_val
 
-    def forward(self, outputs, targets, nonpadding):
+    def forward(self, pred_logdur, targets, nonpadding):
         """
         Args:
-            outputs (Tensor): Batch of prediction durations in log domain (B, T)
+            pred_logdur (Tensor): Batch of prediction durations in log domain (B, T)
             targets (LongTensor): Batch of groundtruth durations in linear domain (B, T)
         Returns:
             Tensor: Mean squared error loss value.
         Note:
-            `outputs` is in log domain but `targets` is in linear domain.
+            `pred_logdur` is in log domain but `targets` is in linear domain.
         """
-        # NOTE: outputs is in log domain while targets in linear
-        targets = torch.log(targets.float() + self.offset)
-        loss = self.criterion(outputs, targets.float())
+        log_targets = safe_log(targets.float(), clip_val=self.clip_val)
+        loss = self.criterion(pred_logdur, log_targets)
         loss = (loss * nonpadding).sum() / nonpadding.sum()
         return loss
 
 
-class STFTMagnitudeLoss(nn.Module):
-    """STFT magnitude loss module.
-
-    See [Arik et al., 2018](https://arxiv.org/abs/1808.06719)
-    and [Engel et al., 2020](https://arxiv.org/abs/2001.04643v1)
-
-    Log-magnitudes are calculated with `log(log_fac*x + log_eps)`, where `log_fac` controls the
-    compression strength (larger value results in more compression), and `log_eps` can be used
-    to control the range of the compressed output values (e.g., `log_eps>=1` ensures positive
-    output values). The default values `log_fac=1` and `log_eps=0` correspond to plain log-compression.
-
-    Args:
-        log (bool, optional): Log-scale the STFT magnitudes,
-            or use linear scale. Default: True
-        log_eps (float, optional): Constant value added to the magnitudes before evaluating the logarithm.
-            Default: 0.0
-        log_fac (float, optional): Constant multiplication factor for the magnitudes before evaluating the logarithm.
-            Default: 1.0
-        distance (str, optional): Distance function ["L1", "L2"]. Default: "L1"
-        reduction (str, optional): Reduction of the loss elements. Default: "mean"
+class LogMelSpecReconstructionLoss(nn.Module):
+    """
+    L1 distance between the mel-scaled magnitude spectrograms of the ground truth sample and the generated sample
     """
 
-    def __init__(self, log=True, log_eps=0.0, log_fac=1.0, distance="L1", reduction="mean"):
-        super(STFTMagnitudeLoss, self).__init__()
+    def __init__(self,clip_val: float = 1e-7):
+        super().__init__()
+        self.clip_val = clip_val
 
-        self.log = log
-        self.log_eps = log_eps
-        self.log_fac = log_fac
+    def forward(self, y_hat, y, mask) -> torch.Tensor:
+        """
+        Args:
+            y_hat (Tensor): Predicted melspectogram.
+            y (Tensor): Ground truth melspectogram.
+            mask (Tensor): valid elements in the melspectogram.
 
-        if distance == "L1":
-            self.distance = torch.nn.L1Loss(reduction=reduction)
-        elif distance == "L2":
-            self.distance = torch.nn.MSELoss(reduction=reduction)
-        else:
-            raise ValueError(f"Invalid distance: '{distance}'.")
+        Returns:
+            Tensor: L1 loss between the mel-scaled magnitude spectrograms.
+        """
+        mel_hat = safe_log(y_hat, clip_val=self.clip_val)
+        mel = safe_log(y, clip_val=self.clip_val)
 
-    def forward(self, x_mag, y_mag):
-        if self.log:
-            x_mag = torch.log(self.log_fac * x_mag + self.log_eps)
-            y_mag = torch.log(self.log_fac * y_mag + self.log_eps)
-        return self.distance(x_mag, y_mag)
+        mel_mask = mask.bool()
+        mel_hat = mel_hat.masked_select(mel_mask)
+        mel = mel.masked_select(mel_mask)
+        loss = nn.functional.l1_loss(mel, mel_hat)
+
+        return loss
+
+
+
+def safe_log(x: torch.Tensor, clip_val: float = 1e-7) -> torch.Tensor:
+    """
+    Computes the element-wise logarithm of the input tensor with clipping to avoid near-zero values.
+
+    Args:
+        x (Tensor): Input tensor.
+        clip_val (float, optional): Minimum value to clip the input tensor. Defaults to 1e-7.
+
+    Returns:
+        Tensor: Element-wise logarithm of the input tensor with clipping applied.
+    """
+    return torch.log(torch.clip(x, min=float(clip_val)))
+
+
+class MSEMelSpecReconstructionLoss(nn.Module):
+    """
+    MSE loss of the mel-scaled magnitude spectrograms of the ground truth sample and the generated sample
+    """
+
+    def forward(self, y_hat, y, mask) -> torch.Tensor:
+        """
+        Args:
+            y_hat (Tensor): Predicted melspectogram.
+            y (Tensor): Ground truth melspectogram.
+            mask (Tensor): valid elements in the melspectogram.
+
+        Returns:
+            Tensor: MSE loss between the mel-scaled magnitude spectrograms.
+        """
+        mel_mask = mask.bool()
+        mel_hat = y_hat.masked_select(mel_mask)
+        mel = y.masked_select(mel_mask)
+        loss = F.mse_loss(mel_hat, mel)
+
+        return loss
+
+
+
+def safe_log(x: torch.Tensor, clip_val: float = 1e-7) -> torch.Tensor:
+    """
+    Computes the element-wise logarithm of the input tensor with clipping to avoid near-zero values.
+
+    Args:
+        x (Tensor): Input tensor.
+        clip_val (float, optional): Minimum value to clip the input tensor. Defaults to 1e-7.
+
+    Returns:
+        Tensor: Element-wise logarithm of the input tensor with clipping applied.
+    """
+    return torch.log(torch.clip(x, min=float(clip_val)))
+
 

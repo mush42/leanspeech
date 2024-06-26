@@ -59,18 +59,14 @@ class BaseLightningModule(LightningModule, ABC):
         x, x_lengths = batch["x"], batch["x_lengths"]
         y, y_lengths = batch["y"], batch["y_lengths"]
 
-        mel, loss, dur_loss, mel_loss = self(
+        outputs = self(
             x=x,
             x_lengths=x_lengths,
             y=y,
             y_lengths=y_lengths,
             durations=batch["durations"],
         )
-        return {
-            "dur_loss": dur_loss,
-            "mel_loss": mel_loss,
-            "loss": loss,
-        }
+        return outputs
 
     def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         self.ckpt_loaded_epoch = checkpoint["epoch"]  # pylint: disable=attribute-defined-outside-init
@@ -166,10 +162,17 @@ class BaseLightningModule(LightningModule, ABC):
                 x = one_batch["x"][i].unsqueeze(0).to(self.device)
                 x_lengths = one_batch["x_lengths"][i].unsqueeze(0).to(self.device)
                 output = self.synthesize(x[:, :x_lengths], x_lengths)
-                mel = output[0]
+                mel = output["mel"]
                 self.logger.experiment.add_image(
                     f"generated_mel/{i}",
                     plot_tensor(mel.squeeze().cpu()),
+                    self.current_epoch,
+                    dataformats="HWC",
+                )
+                attn = output["attn"]
+                self.logger.experiment.add_image(
+                    f"alignment/{i}",
+                    plot_tensor(attn.squeeze().cpu()),
                     self.current_epoch,
                     dataformats="HWC",
                 )

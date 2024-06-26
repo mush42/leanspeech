@@ -6,74 +6,50 @@ from .leanspeech_block  import LeanSpeechBlock
 
 
 class TextEncoder(nn.Module):
-    def __init__(self, n_vocab, n_feats, dim, convnext_layers, intermediate_dim=None):
+    def __init__(self, n_vocab, dim, convnext_layers):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, dim, padding_idx=0)
-        self.ls_blocks = nn.ModuleList()
-        for (kernel_size, num_conv_layers) in convnext_layers:
-            self.ls_blocks.append(
-                LeanSpeechBlock(
-                    dim=dim,
-                    kernel_size=kernel_size,
-                    num_conv_layers=num_conv_layers,
-                    intermediate_dim=intermediate_dim
-                )
-            )
-        self.proj_m = torch.nn.Conv1d(dim, n_feats, 1)
+        self.ls_blocks = nn.ModuleList([
+            LeanSpeechBlock(dim=dim, **layer_config)
+            for layer_config in convnext_layers
+        ])
 
-    def forward(self, x, mask):
+    def forward(self, x, lengths, mask):
         x = self.emb(x)
         for ls_block in self.ls_blocks:
-            x = ls_block(x)
-        x = x.transpose(1, 2)
-        x = self.proj_m(x)
+            x = ls_block(x, lengths)
         return x
 
 
 class DurationPredictor(nn.Module):
-    def __init__(self, dim, convnext_layers, intermediate_dim=None):
+    def __init__(self, dim, convnext_layers):
         super().__init__()
-        self.ls_blocks = nn.ModuleList()
-        for (kernel_size, num_conv_layers) in convnext_layers:
-            self.ls_blocks.append(
-                LeanSpeechBlock(
-                    dim=dim,
-                    kernel_size=kernel_size,
-                    num_conv_layers=num_conv_layers,
-                    intermediate_dim=intermediate_dim
-                )
-            )
+        self.ls_blocks = nn.ModuleList([
+            LeanSpeechBlock(dim=dim, **layer_config)
+            for layer_config in convnext_layers
+        ])
         self.proj = torch.nn.Linear(dim, 1)
 
-    def forward(self, x, mask):
-        x = x.transpose(1, 2)
+    def forward(self, x, lengths, mask):
         org_x = x
         for ls_block in self.ls_blocks:
-            x = x + ls_block(org_x)
+            x = x + ls_block(org_x, lengths)
         x = self.proj(x).transpose(1, 2)
         return x
 
 
 class Decoder(nn.Module):
-    def __init__(
-        self, n_mel_channels, dim, convnext_layers, intermediate_dim=None
-    ):
+    def __init__(self, n_mel_channels, dim, convnext_layers):
         super().__init__()
-        self.ls_blocks = nn.ModuleList()
-        for (kernel_size, num_conv_layers) in convnext_layers:
-            self.ls_blocks.append(
-                LeanSpeechBlock(
-                    dim=dim,
-                    kernel_size=kernel_size,
-                    num_conv_layers=num_conv_layers,
-                    intermediate_dim=intermediate_dim
-                )
-            )
+        self.ls_blocks = nn.ModuleList([
+            LeanSpeechBlock(dim=dim, **layer_config)
+            for layer_config in convnext_layers
+        ])
         self.mel_linear = nn.Linear(dim, n_mel_channels)
 
-    def forward(self, x, mask):
+    def forward(self, x, lengths, mask):
         for ls_block in self.ls_blocks:
-            x = ls_block(x)
+            x = ls_block(x, lengths)
         x = self.mel_linear(x)
         x = x.transpose(1, 2)
         return x
@@ -88,7 +64,7 @@ class LengthRegulator(nn.Module):
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
         attn = generate_path(durations.squeeze(1), attn_mask.squeeze(1))
         # Align encoded text with mel-spectrogram and get mu_y segment
-        mu_y = torch.matmul(attn.float().transpose(1, 2), x.transpose(1, 2))
+        mu_y = torch.matmul(attn.float().transpose(1, 2), x)
         mu_y = mu_y[:, :y_max_length, :]
         attn = attn[:, :, :y_max_length]
         # Compute loss between predicted log-scaled durations and the ground truth durations
@@ -107,7 +83,7 @@ class LengthRegulator(nn.Module):
         y_mask = sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
         attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
-        mu_y = torch.matmul(attn.float().squeeze(1).transpose(1, 2), x.transpose(1, 2))
+        mu_y = torch.matmul(attn.float().squeeze(1).transpose(1, 2), x)
         y = mu_y[:, :y_max_length, :]
         y_mask = y_mask[:, :, :y_max_length]
-        return w_ceil, y, y_lengths, y_mask
+        return w_ceil, attn, y, y_lengths, y_mask

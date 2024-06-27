@@ -9,6 +9,7 @@ hydra-colorlog==1.2.0
 hydra-optuna-sweeper==1.2.0
 onnx
 onnxruntime
+onnxruntime-gpu
 
 # --------- others --------- #
 piper-phonemize~=1.1.0

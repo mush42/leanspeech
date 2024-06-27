@@ -9,6 +9,7 @@ import hydra
 from hydra import compose, initialize
 from omegaconf import OmegaConf
 
+from leanspeech.onnx.export import export_as_onnx
 from leanspeech.text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
 
 
@@ -34,6 +35,7 @@ with initialize(version_base=None, config_path="./configs"):
 model = hydra.utils.instantiate(cfg.model)
 print(summarize(model))
 
+# export_as_onnx(model, "Thanks_Allah.onnx", 16)
 
 # Dataset pipeline
 dataset_cfg.data.batch_size = 1

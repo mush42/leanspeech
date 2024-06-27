@@ -4,6 +4,8 @@ import torch
 from torch import nn
 from torch.nn.utils import weight_norm, remove_weight_norm
 
+from .kernel_warehouse import Warehouse_Manager
+
 
 class ConvNeXtBlock(nn.Module):
     """ConvNeXt Block adapted from https://github.com/facebookresearch/ConvNeXt to 1D audio signal.
@@ -22,18 +24,43 @@ class ConvNeXtBlock(nn.Module):
         dim: int,
         intermediate_dim: int,
         layer_scale_init_value: float,
+        warehouse_manager: Warehouse_Manager,
+        stage_idx: int=-1,
+        layer_idx: int=-1,
         adanorm_num_embeddings: Optional[int] = None,
     ):
         super().__init__()
-        self.dwconv = nn.Conv1d(dim, dim, kernel_size=7, padding=3, groups=dim)  # depthwise conv
+        self.dwconv = warehouse_manager.reserve(
+            dim,
+            dim,
+            layer_type='conv1d',
+            kernel_size=7,
+            padding=3,
+            groups=dim,
+            warehouse_name='stage{}_layer{}_dwconv{}'.format(stage_idx, layer_idx, 0)
+        )  # depthwise conv
         self.adanorm = adanorm_num_embeddings is not None
         if adanorm_num_embeddings:
             self.norm = AdaLayerNorm(adanorm_num_embeddings, dim, eps=1e-6)
         else:
             self.norm = nn.LayerNorm(dim, eps=1e-6)
-        self.pwconv1 = nn.Linear(dim, intermediate_dim)  # pointwise/1x1 convs, implemented with linear layers
+        self.pwconv1 = warehouse_manager.reserve(
+            dim,
+            intermediate_dim,
+            layer_type='conv1d',
+            kernel_size=1,
+            padding=0,
+            warehouse_name='stage{}_layer{}_pwconv{}'.format(stage_idx, layer_idx, 1)
+        )  # pointwise/1x1 convs, implemented with linear layers
         self.act = nn.GELU()
-        self.pwconv2 = nn.Linear(intermediate_dim, dim)
+        self.pwconv2 = warehouse_manager.reserve(
+            intermediate_dim,
+            dim,
+            layer_type='conv1d',
+            kernel_size=1,
+            padding=0,
+            warehouse_name='stage{}_layer{}_pwconv{}'.format(stage_idx, layer_idx, 2)
+        )
         self.gamma = (
             nn.Parameter(layer_scale_init_value * torch.ones(dim), requires_grad=True)
             if layer_scale_init_value > 0
@@ -47,11 +74,14 @@ class ConvNeXtBlock(nn.Module):
         if self.adanorm:
             assert cond_embedding_id is not None
             x = self.norm(x, cond_embedding_id)
+            x = x.transpose(1, 2)  # (B, C, T) -> (B, T, C)
         else:
             x = self.norm(x)
+            x = x.transpose(1, 2)  # (B, C, T) -> (B, T, C)
         x = self.pwconv1(x)
         x = self.act(x)
         x = self.pwconv2(x)
+        x = x.transpose(1, 2)  # (B, C, T) -> (B, T, C)
         if self.gamma is not None:
             x = self.gamma * x
         x = x.transpose(1, 2)  # (B, T, C) -> (B, C, T)

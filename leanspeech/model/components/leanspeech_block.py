@@ -2,12 +2,21 @@ import torch
 from torch import nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-from .convnext import ConvNeXtBlock
+from .convnext import ConvNeXtBlock, Warehouse_Manager
 
 
 class LeanSpeechBlock(nn.Module):
     def __init__(self,dim: int, num_conv_layers: int=1, intermediate_dim: int=None):
         super().__init__()
+        self.warehouse_manager = Warehouse_Manager(
+            reduction=0.0625,
+            cell_num_ratio=1,
+            cell_inplane_ratio=1,
+            cell_outplane_ratio=1,
+            nonlocal_basis_ratio=1,
+            sharing_range=('layer', 'pwconv'),
+            norm_layer=nn.LayerNorm,
+        )
         self.dim = dim
         intermediate_dim = intermediate_dim or dim
         layer_scale_init_value = 1 / num_conv_layers
@@ -19,15 +28,19 @@ class LeanSpeechBlock(nn.Module):
             [
                 ConvNeXtBlock(
                     dim=dim,
-                    intermediate_dim=intermediate_dim,
                     layer_scale_init_value=layer_scale_init_value,
+                    warehouse_manager=self.warehouse_manager,
+                    layer_idx=layer_idx,
+                    intermediate_dim=intermediate_dim,
                 )
-                for _ in range(num_conv_layers)
+                for layer_idx in range(num_conv_layers)
             ]
         )
         self.final_layer_norm = nn.LayerNorm(dim, eps=1e-6)
         self.dropout = nn.Dropout(0.1)
-        self.apply(self._init_weights)
+        # self.apply(self._init_weights)
+        self.warehouse_manager.store()
+        self.warehouse_manager.allocate(self)
 
     def forward(self, x, lengths):
         lx, hx = self.lstm(x)

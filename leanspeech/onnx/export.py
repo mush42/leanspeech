@@ -15,26 +15,7 @@ DEFAULT_OPSET = 16
 DEFAULT_SEED = 1234
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Export LeanSpeech checkpoints to ONNX")
-
-    parser.add_argument(
-        "checkpoint_path",
-        type=str,
-        help="Path to the model checkpoint",
-    )
-    parser.add_argument("output", type=str, help="Path to output `.onnx` file")
-    parser.add_argument("--opset", type=int, default=DEFAULT_OPSET, help="ONNX opset version to use (default 15")
-    parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="Random seed")
-
-    args = parser.parse_args()
-    seed_everything(args.seed)
-
-    log.info(f"Loading checkpoint from {args.checkpoint_path}")
-    checkpoint_path = Path(args.checkpoint_path)
-    model = LeanSpeech.load_from_checkpoint(checkpoint_path, map_location="cpu")
-    model.eval()
-
+def export_as_onnx(model, out_filename, opset):
     dummy_input_length = 50
     x = torch.randint(low=0, high=20, size=(1, dummy_input_length), dtype=torch.long)
     x_lengths = torch.LongTensor([dummy_input_length])
@@ -56,7 +37,7 @@ def main():
     }
 
     # Create the output directory (if not exists)
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    Path(out_filename).parent.mkdir(parents=True, exist_ok=True)
 
     dummy_input = (x, x_lengths, scales)
 
@@ -67,15 +48,39 @@ def main():
 
     model.forward = _infer_forward
     model.to_onnx(
-        args.output,
+        out_filename,
         dummy_input,
         input_names=input_names,
         output_names=output_names,
         dynamic_axes=dynamic_axes,
-        opset_version=args.opset,
+        opset_version=opset,
         # export_params=True,
         do_constant_folding=True,
     )
+    return out_filename
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Export LeanSpeech checkpoints to ONNX")
+
+    parser.add_argument(
+        "checkpoint_path",
+        type=str,
+        help="Path to the model checkpoint",
+    )
+    parser.add_argument("output", type=str, help="Path to output `.onnx` file")
+    parser.add_argument("--opset", type=int, default=DEFAULT_OPSET, help="ONNX opset version to use (default 15")
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED, help="Random seed")
+
+    args = parser.parse_args()
+    seed_everything(args.seed)
+
+    log.info(f"Loading checkpoint from {args.checkpoint_path}")
+    checkpoint_path = Path(args.checkpoint_path)
+    model = LeanSpeech.load_from_checkpoint(checkpoint_path, map_location="cpu")
+    model.eval()
+
+    export_as_onnx(model, args.output, args.opset)
     log.info(f"ONNX model exported to  {args.output}")
 
 

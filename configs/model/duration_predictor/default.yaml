@@ -1,4 +1,4 @@
 convnext_layers:
-  - num_conv_layers: 2
-    intermediate_dim: 192
+  - num_conv_layers: 3
+    intermediate_dim: 384
   

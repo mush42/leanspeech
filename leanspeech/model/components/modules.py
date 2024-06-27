@@ -4,15 +4,33 @@ from torch import nn
 from leanspeech.utils import fix_len_compatibility, duration_loss, sequence_mask, generate_path
 from .leanspeech_block  import LeanSpeechBlock
 
+from .convnext import Warehouse_Manager
+
 
 class TextEncoder(nn.Module):
     def __init__(self, n_vocab, dim, convnext_layers):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, dim, padding_idx=0)
+        self.warehouse_manager = Warehouse_Manager(
+            reduction=0.0625,
+            cell_num_ratio=1,
+            cell_inplane_ratio=1,
+            cell_outplane_ratio=1,
+            nonlocal_basis_ratio=1,
+            sharing_range=('layer', 'pwconv'),
+            norm_layer=nn.LayerNorm,
+        )
         self.ls_blocks = nn.ModuleList([
-            LeanSpeechBlock(dim=dim, **layer_config)
-            for layer_config in convnext_layers
+            LeanSpeechBlock(
+                dim=dim,
+                stage_idx=stage_idx,
+                warehouse_manager=self.warehouse_manager,
+                **layer_config
+            )
+            for (stage_idx, layer_config) in enumerate(convnext_layers)
         ])
+        self.warehouse_manager.store()
+        self.warehouse_manager.allocate(self)
 
     def forward(self, x, lengths, mask):
         x = self.emb(x)
@@ -24,11 +42,27 @@ class TextEncoder(nn.Module):
 class DurationPredictor(nn.Module):
     def __init__(self, dim, convnext_layers):
         super().__init__()
+        self.warehouse_manager = Warehouse_Manager(
+            reduction=0.0625,
+            cell_num_ratio=1,
+            cell_inplane_ratio=1,
+            cell_outplane_ratio=1,
+            nonlocal_basis_ratio=1,
+            sharing_range=('layer', 'pwconv'),
+            norm_layer=nn.LayerNorm,
+        )
         self.ls_blocks = nn.ModuleList([
-            LeanSpeechBlock(dim=dim, **layer_config)
-            for layer_config in convnext_layers
+            LeanSpeechBlock(
+                dim=dim,
+                stage_idx=stage_idx,
+                warehouse_manager=self.warehouse_manager,
+                **layer_config
+            )
+            for (stage_idx, layer_config) in enumerate(convnext_layers)
         ])
         self.proj = torch.nn.Linear(dim, 1)
+        self.warehouse_manager.store()
+        self.warehouse_manager.allocate(self)
 
     def forward(self, x, lengths, mask):
         org_x = x
@@ -41,11 +75,27 @@ class DurationPredictor(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, n_mel_channels, dim, convnext_layers):
         super().__init__()
+        self.warehouse_manager = Warehouse_Manager(
+            reduction=0.0625,
+            cell_num_ratio=1,
+            cell_inplane_ratio=1,
+            cell_outplane_ratio=1,
+            nonlocal_basis_ratio=1,
+            sharing_range=('layer', 'pwconv'),
+            norm_layer=nn.LayerNorm,
+        )
         self.ls_blocks = nn.ModuleList([
-            LeanSpeechBlock(dim=dim, **layer_config)
-            for layer_config in convnext_layers
+            LeanSpeechBlock(
+                dim=dim,
+                stage_idx=stage_idx,
+                warehouse_manager=self.warehouse_manager,
+                **layer_config
+            )
+            for (stage_idx, layer_config) in enumerate(convnext_layers)
         ])
         self.mel_linear = nn.Linear(dim, n_mel_channels)
+        self.warehouse_manager.store()
+        self.warehouse_manager.allocate(self)
 
     def forward(self, x, lengths, mask):
         for ls_block in self.ls_blocks:

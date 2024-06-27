@@ -6,18 +6,17 @@ from .convnext import ConvNeXtBlock, Warehouse_Manager
 
 
 class LeanSpeechBlock(nn.Module):
-    def __init__(self,dim: int, num_conv_layers: int=1, intermediate_dim: int=None):
+    def __init__(self,
+        dim: int,
+        stage_idx: int,
+        warehouse_manager: Warehouse_Manager,
+        *,
+        num_conv_layers: int=1,
+        intermediate_dim: int=None
+    ):
         super().__init__()
-        self.warehouse_manager = Warehouse_Manager(
-            reduction=0.0625,
-            cell_num_ratio=1,
-            cell_inplane_ratio=1,
-            cell_outplane_ratio=1,
-            nonlocal_basis_ratio=1,
-            sharing_range=('layer', 'pwconv'),
-            norm_layer=nn.LayerNorm,
-        )
         self.dim = dim
+        self.warehouse_manager = warehouse_manager
         intermediate_dim = intermediate_dim or dim
         layer_scale_init_value = 1 / num_conv_layers
         self.lstm = nn.LSTM(
@@ -30,6 +29,7 @@ class LeanSpeechBlock(nn.Module):
                     dim=dim,
                     layer_scale_init_value=layer_scale_init_value,
                     warehouse_manager=self.warehouse_manager,
+                    stage_idx=stage_idx,
                     layer_idx=layer_idx,
                     intermediate_dim=intermediate_dim,
                 )
@@ -39,8 +39,6 @@ class LeanSpeechBlock(nn.Module):
         self.final_layer_norm = nn.LayerNorm(dim, eps=1e-6)
         self.dropout = nn.Dropout(0.1)
         # self.apply(self._init_weights)
-        self.warehouse_manager.store()
-        self.warehouse_manager.allocate(self)
 
     def forward(self, x, lengths):
         lx, hx = self.lstm(x)

@@ -72,7 +72,7 @@ class MatchaInferenceWrapper(LightningModule):
         from matcha.utils.model import  denormalize, fix_len_compatibility, generate_path, sequence_mask
 
         x = x.to(self.device)
-        x_lengths = x_lengths.to("cpu")
+        x_lengths = x_lengths.to(self.device)
 
         if self.matcha.n_spks > 1:
             # Get speaker embedding

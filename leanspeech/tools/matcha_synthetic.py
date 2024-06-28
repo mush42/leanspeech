@@ -80,6 +80,9 @@ class MatchaInferenceWrapper(LightningModule):
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.matcha.encoder(x, x_lengths, spks)
+        mu_x = mu_x.to(self.device)
+        logw = logw.to(self.device)
+        x_mask = x_mask.to(self.device)
 
         w = torch.exp(logw) * x_mask
         w_ceil = torch.ceil(w) * length_scale
@@ -91,19 +94,16 @@ class MatchaInferenceWrapper(LightningModule):
         y_mask = sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
         attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
         attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
+        attn = attn.to(self.device)
 
         # Align encoded text and get mu_y
         mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
         mu_y = mu_y.transpose(1, 2)
-        encoder_outputs = mu_y[:, :, :y_max_length]
 
         # Generate sample tracing the probability flow
         decoder_outputs = self.matcha.decoder(mu_y, y_mask, n_timesteps, temperature, spks)
-        decoder_outputs = decoder_outputs[:, :, :y_max_length]
 
         return {
-            "encoder_outputs": encoder_outputs,
-            "decoder_outputs": decoder_outputs,
             "attn": attn[:, :, :y_max_length],
             "mel": denormalize(decoder_outputs, self.matcha.mel_mean, self.matcha.mel_std),
             "mel_lengths": y_lengths,

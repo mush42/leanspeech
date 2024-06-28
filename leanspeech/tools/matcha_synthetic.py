@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import onnxruntime
 import rootutils
+from lightning import LightningModule
 from more_itertools import chunked
 from tqdm import tqdm
 
@@ -28,7 +29,7 @@ ONNX_CUDA_PROVIDERS = [
 ONNX_CPU_PROVIDERS = ["CPUExecutionProvider",]
 
 
-class MatchaInferenceWrapper(torch.nn.Module):
+class MatchaInferenceWrapper(LightningModule):
     def __init__(self, matcha):
         super().__init__()
         self.matcha = matcha
@@ -69,6 +70,9 @@ class MatchaInferenceWrapper(torch.nn.Module):
                 # durations of phonemes in mel frames
         """
         from matcha.utils.model import  denormalize, fix_len_compatibility, generate_path, sequence_mask
+
+        x = x.to(self.device)
+        x_lengths = x_lengths.to("cpu")
 
         if self.matcha.n_spks > 1:
             # Get speaker embedding

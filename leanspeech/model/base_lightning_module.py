@@ -31,29 +31,23 @@ class BaseLightningModule(LightningModule, ABC):
 
     def configure_optimizers(self) -> Any:
         optimizer = self.hparams.optimizer(params=self.parameters())
-        if self.hparams.scheduler not in (None, {}):
-            scheduler_args = {}
-            # Manage last epoch for exponential schedulers
-            current_epoch = -1
-            if "last_epoch" in inspect.signature(self.hparams.scheduler.scheduler).parameters:
-                if hasattr(self, "ckpt_loaded_epoch"):
-                    current_epoch = self.ckpt_loaded_epoch - 1
-    
-            scheduler_args.update({"optimizer": optimizer})
-            scheduler = self.hparams.scheduler.scheduler(**scheduler_args)
-            scheduler.last_epoch = current_epoch
-            return {
-                "optimizer": optimizer,
-                "lr_scheduler": {
-                    "scheduler": scheduler,
-                    "monitor": "loss/val_epoch",
-                    # "interval": self.hparams.scheduler.lightning_args.interval,
-                    # "frequency": self.hparams.scheduler.lightning_args.frequency,
-                    # "name": "learning_rate",
-                },
-            }
-
-        return {"optimizer": optimizer}
+        if self.hparams.scheduler in (None, {}):
+            return {"optimizer": optimizer}
+        scheduler_args = {}
+        # Manage last epoch for exponential schedulers
+        current_epoch = -1
+        scheduler_cls = self.hparams.scheduler.func
+        if "last_epoch" in inspect.signature(scheduler_cls).parameters:
+            if hasattr(self, "ckpt_loaded_epoch"):
+                current_epoch = self.ckpt_loaded_epoch - 1
+                scheduler_args["last_epoch"] = current_epoch
+        scheduler_args.update({"optimizer": optimizer})
+        scheduler = self.hparams.scheduler(**scheduler_args)
+        scheduler.last_epoch = current_epoch
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler,
+        }
 
     def get_losses(self, batch):
         x, x_lengths = batch["x"], batch["x_lengths"]

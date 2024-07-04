@@ -1,5 +1,3 @@
-convnext_layers:
-  - num_conv_layers: 3
-    intermediate_dim: 512
-  - num_conv_layers: 3
-    intermediate_dim: 384
+arch:
+  - [5, 21]
+  - [13, 9]

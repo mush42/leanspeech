@@ -9,7 +9,7 @@ class DurationPredictorLoss(torch.nn.Module):
     The loss value is Calculated in log domain to make it Gaussian.
     """
 
-    def __init__(self, clip_val: float = 1e-7, reduction: str="none"):
+    def __init__(self, clip_val: float = 1e-12, reduction: str="none"):
         """
         Args:
             clip_val (float, optional): Offset value to avoid nan in log domain.
@@ -40,7 +40,7 @@ class LogMelSpecReconstructionLoss(nn.Module):
     L1 distance between the mel-scaled magnitude spectrograms of the ground truth sample and the generated sample
     """
 
-    def __init__(self,clip_val: float = 1e-7):
+    def __init__(self,clip_val: float = 1e-12):
         super().__init__()
         self.clip_val = clip_val
 
@@ -66,7 +66,7 @@ class LogMelSpecReconstructionLoss(nn.Module):
 
 
 
-def safe_log(x: torch.Tensor, clip_val: float = 1e-7) -> torch.Tensor:
+def safe_log(x: torch.Tensor, clip_val: float = 1e-12) -> torch.Tensor:
     """
     Computes the element-wise logarithm of the input tensor with clipping to avoid near-zero values.
 
@@ -110,7 +110,7 @@ def safe_log(x: torch.Tensor, clip_val: float = 1e-7) -> torch.Tensor:
 
     Args:
         x (Tensor): Input tensor.
-        clip_val (float, optional): Minimum value to clip the input tensor. Defaults to 1e-7.
+        clip_val (float, optional): Minimum value to clip the input tensor. Defaults to 1e-12.
 
     Returns:
         Tensor: Element-wise logarithm of the input tensor with clipping applied.

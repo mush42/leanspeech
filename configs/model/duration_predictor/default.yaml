@@ -1,3 +1,5 @@
-convnext_layers:
-  - num_conv_layers: 2
-    intermediate_dim: 256
+num_layers: 2
+kernel_size: 3
+intermediate_dim: 384
+dropout: 0.1
+activation: relu

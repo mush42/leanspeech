@@ -1,105 +1,91 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
+from leanspeech.utils import fix_len_compatibility, sequence_mask, generate_path
 
-from leanspeech.utils import fix_len_compatibility, duration_loss, sequence_mask, generate_path
 from .leanspeech_block  import LeanSpeechBlock
+from .conv_sep import ConvSeparable, build_activation
 
-from .convnext import Warehouse_Manager
+
+class LayerNormWithDim(nn.LayerNorm):
+    """Layer normalization module.
+    :param int nout: output dim size
+    :param int dim: dimension to be normalized
+    """
+
+    def __init__(self, nout, dim=-1, eps=1e-12):
+        """Construct an LayerNorm object."""
+        super(LayerNormWithDim, self).__init__(nout, eps=eps)
+        self.dim = dim
+
+    def forward(self, x):
+        """Apply layer normalization.
+        :param torch.Tensor x: input tensor
+        :return: layer normalized tensor
+        :rtype torch.Tensor
+        """
+        if self.dim == -1:
+            return super(LayerNormWithDim, self).forward(x)
+        return super(LayerNormWithDim, self).forward(x.transpose(1, -1)).transpose(1, -1)
 
 
 class TextEncoder(nn.Module):
-    def __init__(self, n_vocab, dim, convnext_layers):
+    def __init__(self, n_vocab, dim, layer_config):
         super().__init__()
         self.emb = nn.Embedding(n_vocab, dim, padding_idx=0)
-        self.warehouse_manager = Warehouse_Manager(
-            reduction=0.0625,
-            cell_num_ratio=1,
-            cell_inplane_ratio=1,
-            cell_outplane_ratio=1,
-            nonlocal_basis_ratio=1,
-            sharing_range=('layer', 'pwconv'),
-            norm_layer=nn.LayerNorm,
-        )
-        self.ls_blocks = nn.ModuleList([
-            LeanSpeechBlock(
-                dim=dim,
-                stage_idx=stage_idx,
-                warehouse_manager=self.warehouse_manager,
-                **layer_config
-            )
-            for (stage_idx, layer_config) in enumerate(convnext_layers)
+        self.leanspeech_blocks = nn.ModuleList([
+            LeanSpeechBlock(dim, kernel_sizes)
+            for kernel_sizes in layer_config.arch
         ])
-        self.warehouse_manager.store()
-        self.warehouse_manager.allocate(self)
 
     def forward(self, x, lengths, mask):
         x = self.emb(x)
-        for ls_block in self.ls_blocks:
-            x = ls_block(x, lengths)
+        for block in self.leanspeech_blocks:
+            x = block(x, lengths, mask)
         return x
 
 
 class DurationPredictor(nn.Module):
-    def __init__(self, dim, convnext_layers):
+    def __init__(self, dim, layer_config):
         super().__init__()
-        self.warehouse_manager = Warehouse_Manager(
-            reduction=0.0625,
-            cell_num_ratio=1,
-            cell_inplane_ratio=1,
-            cell_outplane_ratio=1,
-            nonlocal_basis_ratio=1,
-            sharing_range=('layer', 'pwconv'),
-            norm_layer=nn.LayerNorm,
-        )
-        self.ls_blocks = nn.ModuleList([
-            LeanSpeechBlock(
-                dim=dim,
-                stage_idx=stage_idx,
-                warehouse_manager=self.warehouse_manager,
-                **layer_config
+        self.kernel_size = layer_config.kernel_size
+        num_layers = layer_config.num_layers
+        intermediate_dim = layer_config.intermediate_dim
+        dropout = layer_config.dropout
+        activation = layer_config.activation
+        self.conv_blocks = nn.ModuleList([
+            torch.nn.Sequential(
+                ConvSeparable(dim if idx == 0 else intermediate_dim, intermediate_dim, self.kernel_size),
+                build_activation(activation),
+                LayerNormWithDim(intermediate_dim, dim=1),
+                nn.Dropout(dropout)
             )
-            for (stage_idx, layer_config) in enumerate(convnext_layers)
+            for idx in range(num_layers)
         ])
-        self.proj = torch.nn.Linear(dim, 1)
-        self.warehouse_manager.store()
-        self.warehouse_manager.allocate(self)
+        self.proj = torch.nn.Linear(intermediate_dim, 1)
 
     def forward(self, x, lengths, mask):
-        org_x = x
-        for ls_block in self.ls_blocks:
-            x = x + ls_block(org_x, lengths)
-        x = self.proj(x).transpose(1, 2)
+        x = x.transpose(1, 2)
+        for block in self.conv_blocks:
+            x = F.pad(x, [self.kernel_size // 2, self.kernel_size // 2])
+            x = block(x)
+        x = x.transpose(1, 2)
+        x = self.proj(x).transpose(1, 2).squeeze(1)
         return x
 
 
 class Decoder(nn.Module):
-    def __init__(self, n_mel_channels, dim, convnext_layers):
+    def __init__(self, n_mel_channels, dim, layer_config):
         super().__init__()
-        self.warehouse_manager = Warehouse_Manager(
-            reduction=0.0625,
-            cell_num_ratio=1,
-            cell_inplane_ratio=1,
-            cell_outplane_ratio=1,
-            nonlocal_basis_ratio=1,
-            sharing_range=('layer', 'pwconv'),
-            norm_layer=nn.LayerNorm,
-        )
-        self.ls_blocks = nn.ModuleList([
-            LeanSpeechBlock(
-                dim=dim,
-                stage_idx=stage_idx,
-                warehouse_manager=self.warehouse_manager,
-                **layer_config
-            )
-            for (stage_idx, layer_config) in enumerate(convnext_layers)
+        self.leanspeech_blocks = nn.ModuleList([
+            LeanSpeechBlock(dim, kernel_sizes)
+            for kernel_sizes in layer_config.arch
         ])
         self.mel_linear = nn.Linear(dim, n_mel_channels)
-        self.warehouse_manager.store()
-        self.warehouse_manager.allocate(self)
 
     def forward(self, x, lengths, mask):
-        for ls_block in self.ls_blocks:
-            x = ls_block(x, lengths)
+        for block in self.leanspeech_blocks:
+            x = block(x, lengths, mask)
         x = self.mel_linear(x)
         x = x.transpose(1, 2)
         return x
@@ -119,8 +105,7 @@ class LengthRegulator(nn.Module):
         attn = attn[:, :, :y_max_length]
         # Compute loss between predicted log-scaled durations and the ground truth durations
         logw_gt = torch.log(1e-8 + torch.sum(attn.unsqueeze(1), -1)) * x_mask
-        dur_loss = duration_loss(logw, logw_gt, x_lengths)
-        return mu_y, dur_loss, attn
+        return mu_y, attn
 
     @torch.inference_mode
     def infer(self, x, x_mask, logw, length_scale=1.0):

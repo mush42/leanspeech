@@ -38,7 +38,7 @@ print(summarize(model))
 # export_as_onnx(model, "Thanks_Allah.onnx", 16)
 
 # Dataset pipeline
-dataset_cfg.data.batch_size = 1
+dataset_cfg.data.batch_size = 3
 dataset_cfg.data.num_workers = 0
 dataset_cfg.data.seed = 42
 dataset_cfg.data.pin_memory = False
@@ -53,11 +53,11 @@ print(f"Batch['durations'] shape: {batch['durations'].shape}")
 
 
 # Training
-x = batch["x"][0].unsqueeze(0)
-x_lengths = torch.LongTensor([x.shape[-1]])
-y = torch.rand(1, 80, 125)
-y_lengths = torch.LongTensor([y.shape[-1]])
-durations = torch.randint(1, 2, (1, x.size(1)))
+x = batch["x"]
+x_lengths = batch["x_lengths"]
+y = batch["y"]
+y_lengths = batch["y_lengths"]
+durations = batch["durations"]
 outputs = model(x, x_lengths, y, y_lengths, durations)
 
 # Training loop

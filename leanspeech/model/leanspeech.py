@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from ..utils import sequence_mask, denormalize_mel
 from .base_lightning_module import BaseLightningModule
 from .components.modules import TextEncoder, DurationPredictor, Decoder, LengthRegulator
-from .components.losses import MSEMelSpecReconstructionLoss
+from .components.losses import DurationPredictorLoss, MSEMelSpecReconstructionLoss
 
 
 class LeanSpeech(BaseLightningModule):
@@ -27,18 +27,19 @@ class LeanSpeech(BaseLightningModule):
         self.encoder = TextEncoder(
             n_vocab=n_vocab,
             dim=dim,
-            convnext_layers=encoder.convnext_layers,
+            layer_config=encoder
         )
         self.duration_predictor = DurationPredictor(
             dim=dim,
-            convnext_layers=duration_predictor.convnext_layers,
+            layer_config=duration_predictor
         )
         self.length_regulator = LengthRegulator()
         self.decoder = Decoder(
             n_mel_channels=n_feats,
             dim=dim,
-            convnext_layers=decoder.convnext_layers,
+            layer_config=decoder
         )
+        self.dur_loss_criteria = DurationPredictorLoss()
         self.mel_loss = MSEMelSpecReconstructionLoss()
         self.w_mel_loss = loss_weights["mel"]
         self.w_dur_loss = loss_weights["duration"]
@@ -76,9 +77,10 @@ class LeanSpeech(BaseLightningModule):
 
         # Duration predictor
         logw= self.duration_predictor(x, x_lengths, x_mask)
+        dur_loss = self.dur_loss_criteria(logw, durations, x_mask.squeeze(1))
 
         # Length regulator
-        x, dur_loss, attn= self.length_regulator(x, x_lengths, x_mask, y, y_lengths, y_mask, logw, durations)
+        x, attn= self.length_regulator(x, x_lengths, x_mask, y, y_lengths, y_mask, logw, durations)
 
         # Decoder
         mel = self.decoder(x, y_lengths, y_mask)

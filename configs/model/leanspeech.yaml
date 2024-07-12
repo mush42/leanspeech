@@ -1,15 +1,15 @@
 defaults:
   - _self_
-  - encoder: default.yaml
-  - duration_predictor: default.yaml
-  - decoder: default.yaml
-  - optimizer: default.yaml
-  - scheduler: default.yaml
+  - encoder: default
+  - duration_predictor: default
+  - decoder: default
+  - optimizer: adamw
+  - scheduler: cosine_with_warmup
 
-_target_: leanspeech.model.leanspeech.LeanSpeech
-dim: 256
-n_vocab: 178
-n_feats: 80
+_target_: leanspeech.model.LeanSpeech
+dim: 192
+sample_rate: ${data.sample_rate}
+n_feats: ${data.n_feats}
 loss_weights:
   mel: 5.0
   duration: 1.0

@@ -4,7 +4,7 @@ defaults:
 
 # Dataset URL: https://ast-astrec.nict.go.jp/en/release/hi-fi-captain/
 _target_: leanspeech.dataset.TextMelDataModule
-name: hi-fi_en-US_female
+name: hfc_female-en_us
 language: "en-us"
 train_filelist_path: data/hfc_female-en_US/train.txt
 valid_filelist_path: data/hfc_female-en_US/val.txt

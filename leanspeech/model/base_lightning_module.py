@@ -29,25 +29,22 @@ class BaseLightningModule(LightningModule, ABC):
         self.register_buffer("mel_mean", torch.tensor(data_statistics["mel_mean"]))
         self.register_buffer("mel_std", torch.tensor(data_statistics["mel_std"]))
 
-    def configure_optimizers(self) -> Any:
-        optimizer = self.hparams.optimizer(params=self.parameters())
-        if self.hparams.scheduler in (None, {}):
-            return {"optimizer": optimizer}
-        scheduler_args = {}
-        # Manage last epoch for exponential schedulers
-        current_epoch = -1
-        scheduler_cls = self.hparams.scheduler.func
-        if "last_epoch" in inspect.signature(scheduler_cls).parameters:
-            if hasattr(self, "ckpt_loaded_epoch"):
-                current_epoch = self.ckpt_loaded_epoch - 1
-                scheduler_args["last_epoch"] = current_epoch
-        scheduler_args.update({"optimizer": optimizer})
-        scheduler = self.hparams.scheduler(**scheduler_args)
-        scheduler.last_epoch = current_epoch
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": scheduler,
-        }
+    def configure_optimizers(self):
+        params = [
+            {"params": self.parameters()},
+        ]
+        opt = self.hparams.optimizer(params)
+        # Max steps per optimizer
+        max_steps = self.trainer.max_steps
+        scheduler = self.hparams.scheduler(
+            opt,
+            num_training_steps=max_steps,
+            last_epoch=getattr("self", "ckpt_loaded_epoch", -1)
+        )
+        return (
+            [opt],
+            [{"scheduler": scheduler, "interval": "step"}],
+        )
 
     def get_losses(self, batch):
         x, x_lengths = batch["x"], batch["x_lengths"]
@@ -160,13 +157,6 @@ class BaseLightningModule(LightningModule, ABC):
                 self.logger.experiment.add_image(
                     f"generated_mel/{i}",
                     plot_tensor(mel.squeeze().cpu()),
-                    self.current_epoch,
-                    dataformats="HWC",
-                )
-                attn = output["attn"]
-                self.logger.experiment.add_image(
-                    f"alignment/{i}",
-                    plot_tensor(attn.squeeze().cpu()),
                     self.current_epoch,
                     dataformats="HWC",
                 )

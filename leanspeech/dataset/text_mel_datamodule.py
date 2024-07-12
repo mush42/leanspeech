@@ -13,7 +13,7 @@ from lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
 from leanspeech.text import process_and_phonemize_text_matcha, process_and_phonemize_text_piper
-from leanspeech.utils import normalize_mel, fix_len_compatibility
+from leanspeech.utils import normalize_mel
 from leanspeech.utils.audio import mel_spectrogram
 
 
@@ -247,7 +247,6 @@ class TextMelBatchCollate:
     def __call__(self, batch):
         B = len(batch)
         y_max_length = max([item["y"].shape[-1] for item in batch])
-        # y_max_length = fix_len_compatibility(y_max_length)
         x_max_length = max([item["x"].shape[-1] for item in batch])
         n_feats = batch[0]["y"].shape[-2]
 

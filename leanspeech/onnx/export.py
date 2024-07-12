@@ -25,7 +25,7 @@ def export_as_onnx(model, out_filename, opset):
     scales = torch.Tensor([length_scale])
 
     input_names = ["x", "x_lengths", "scales",]
-    output_names = ["mel", "mel_lengths", "w_ceil"]
+    output_names = ["mel", "mel_lengths", "durations"]
 
     # Set dynamic shape for inputs/outputs
     dynamic_axes = {
@@ -33,7 +33,7 @@ def export_as_onnx(model, out_filename, opset):
         "x_lengths": {0: "batch_size"},
         "mel": {0: "batch_size", 2: "frames"},
         "mel_lengths": {0: "batch_size", 2: "frames"},
-        "w_ceil": {0: "batch_size", 1: "time"},
+        "durations": {0: "batch_size", 1: "time"},
     }
 
     # Create the output directory (if not exists)
@@ -44,7 +44,7 @@ def export_as_onnx(model, out_filename, opset):
     def _infer_forward(x, x_lengths, scales):
         length_scale = scales[0]
         outputs = model.synthesize(x, x_lengths, length_scale)
-        return outputs["mel"], outputs["mel_lengths"], outputs["w_ceil"]
+        return outputs["mel"], outputs["mel_lengths"], outputs["durations"]
 
     model.forward = _infer_forward
     model.to_onnx(

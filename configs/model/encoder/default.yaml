@@ -1,3 +1,14 @@
-arch:
-  - [5, 21]
-  - [13, 9]
+_target_: leanspeech.model.TextEncoder
+_partial_: true
+n_vocab: 178
+drop_path: 0.2
+dropout: 0.1
+layers:
+  - kernel_size: 5
+    num_conv_layers: 2
+  - kernel_size: 21
+    num_conv_layers: 2
+  - kernel_size: 13
+    num_conv_layers: 2
+  - kernel_size: 9
+    num_conv_layers: 2

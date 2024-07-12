@@ -25,10 +25,9 @@ if sys.platform != 'win32':
 with initialize(version_base=None, config_path="./configs"):
     dataset_cfg = compose(config_name="data/hfc_female-en_US.yaml")
     cfg = compose(config_name="model/leanspeech.yaml")
-    cfg.model.data_statistics = dict(
-        mel_mean=-6.38385,
-        mel_std=2.541796
-    )
+    cfg.model.n_feats = dataset_cfg.data.n_feats
+    cfg.model.sample_rate = dataset_cfg.data.sample_rate
+    cfg.model.data_statistics = dataset_cfg.data.data_statistics
 
 
 # Model
@@ -65,6 +64,7 @@ step_out = model.training_step(batch, 0)
 
 
 # Inference
+model = model.eval()
 t0 = time.perf_counter()
 outputs = model.synthesize(x, x_lengths)
 mel = outputs["mel"]
